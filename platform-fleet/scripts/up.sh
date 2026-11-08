@@ -38,8 +38,7 @@ for tier in $(tiers); do
       --context "$ctx" \
       --owner "$OWNER" --repository platform-fleet --personal \
       --branch main --path "clusters/$tier" \
-      --version "$FLUX_VERSION" \
-      --silent
+      --version "$FLUX_VERSION"
   done
 done
 echo

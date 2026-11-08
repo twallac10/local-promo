@@ -6,8 +6,10 @@ for tier in $(tiers); do
   for ctx in $(tier_contexts "$tier"); do
     echo "=== $tier ($ctx)"
     if ! kubectl --context "$ctx" get ns flux-system >/dev/null 2>&1; then echo "  (unreachable or not bootstrapped)"; continue; fi
-    flux --context "$ctx" get kustomizations -A --no-header 2>/dev/null | awk '{printf "  ks  %-24s ready=%-6s %s\n", $2, $4, $3}'
-    flux --context "$ctx" get helmreleases -A --no-header 2>/dev/null | awk '{printf "  hr  %-24s ready=%-6s %s\n", $2, $5, $3}'
+    # Columns: NAMESPACE NAME REVISION SUSPENDED READY MESSAGE...
+    row='{m=""; for (i = 6; i <= NF; i++) m = m " " $i; printf "  %s  %-24s ready=%-6s %s\n", kind, $2, $5, substr(m, 1, 90)}'
+    flux --context "$ctx" get kustomizations -A --no-header 2>/dev/null | awk -v kind=ks "$row"
+    flux --context "$ctx" get helmreleases -A --no-header 2>/dev/null | awk -v kind=hr "$row"
   done
 done
 
