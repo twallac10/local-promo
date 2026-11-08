@@ -129,7 +129,7 @@ needs higher inotify limits on Linux:
 
 - **One required check:** `promotion / promotion-gate` (caller job `promotion`
   in each app repo's `promotion.yaml`, job `promotion-gate` in the reusable
-  workflow in platform-promoter, pinned `@v0.1.0`).
+  workflow in platform-promoter, pinned `@v0.1.1`).
 - **Why three jobs instead of one.** Branch protection treats a *skipped* job
   as passing. If `promotion-gate` simply needed the guardrails job and the
   guardrails failed, the gate would be skipped and the PR would auto-merge.
