@@ -41,16 +41,39 @@ main plus one commit that copies the source tier's `release.yaml` to
 `tiers/<to>/release.yaml`, and opens (or updates) a PR labelled `promotion`
 with the evidence tables. A failed gate opens nothing.
 
-## In-cluster: `promoter serve`
+## In-cluster: the PromotionGate operator (`promoter serve`)
 
-Deployed by platform-fleet to every cluster (`promoter/`). Gates only its own
-cluster; reacts to Flux notification events (HMAC-signed `generic-hmac`
-Provider, `POST /hook`) and re-checks every app every `RECHECK_INTERVAL`.
+Deployed by platform-fleet to every cluster (`promoter/`). One
+`PromotionGate` per app (generated from apps.yaml, identical in every
+cluster); the operator's tier and cluster come from its env.
+
+```
+$ kubectl -n promoter get promotiongates
+NAME                    APP                     TIER  VERSION  PHASE     MESSAGE
+kyverno                 kyverno                 dev   3.9.3    Passed    promotion PR opened: https://github.com/...
+kube-prometheus-stack   kube-prometheus-stack   dev   93.0.1   Failed    1 failed: canary scraped: no answer within 5m0s: canary target not discovered
+```
+
+- **Watches** the app's Flux Kustomization (`flux-system/<app>`) and
+  HelmRelease (`<ns>/<app>`); a change in what Flux applied or in readiness
+  reconciles the gate. Every gate is also re-evaluated each `RESYNC_INTERVAL`.
+- **Decides from GitHub** (authoritative: the release main declares for this
+  tier, and this cluster's latest gate Deployment), so restarts are safe:
+  new digest → gate; failed → retry 2m after Flux applies something new, else
+  every 30m; stale `in_progress` → 15m; passed but next tier behind → retry
+  the PR every 6h. It waits while Flux isn't Ready, but gates anyway after
+  10m stuck, so a broken release is recorded as a failure.
+- **Status** mirrors the latest run: phase, per-check results, evidence URL,
+  the PR it opened, and a `GatePassed` condition.
+- Gates only its own cluster (refuses any other), one replica with leader
+  election, up to 4 gates in parallel.
+
 Env: `TIER`, `CLUSTER_NAME`, `PROMOTER_FLEET`, `PROMOTER_TOKEN`,
-`WEBHOOK_TOKEN`, `LISTEN` (`:8080`), `RECHECK_INTERVAL` (`10m`). For a
-non-last tier it runs `promote` (the PR opens once every cluster of the tier
-has passed); in the last tier it records the gate only. The image is built by
-`.github/workflows/image.yaml` on `v*` tags → `ghcr.io/<owner>/platform-promoter:<tag>`.
+`RESYNC_INTERVAL` (`10m`), `POD_NAMESPACE`. Health on `:8081`, metrics on
+`:8080`. API types in `api/v1alpha1`; regenerate deepcopy and the CRD
+(`config/crd/`) with `go generate ./api/...`, then copy the CRD to
+`platform-fleet/promoter/crd.yaml` (`task lint` checks they match). The image
+is built by `.github/workflows/image.yaml` on `v*` tags.
 
 ## CI: reusable guardrail workflow
 
@@ -85,8 +108,8 @@ Every app gets the common checks; `checks:` in apps.yaml adds app sets.
 Implement `gate.Check` (`Name`, `Run(ctx, *gate.Env) gate.Result`) and
 register a set in `internal/checks` with `Register(name, factory)`. Return
 `Pending` while there isn't enough data to answer. The interface is small on
-purpose: a check backed by an external system, e.g. a HelmReleaseTest
-resource, just reads that resource's status and maps it to a `Result`.
+purpose: a check backed by an external system (e.g. a custom resource) just
+reads its status and maps it to a `Result`.
 
 ## Layout
 
@@ -94,6 +117,8 @@ resource, just reads that resource's status and maps it to a `Result`.
 cmd/promoter         CLI
 internal/gate        Check interface, runner (poll until answer or timeout), report/table
 internal/checks      common + per-app checks, Prometheus/metrics helpers
+internal/controller  PromotionGate reconciler (in-cluster operator)
+api/v1alpha1         PromotionGate API (CRD in config/crd)
 internal/cluster     kube clients, service HTTP (port-forward locally, DNS in-cluster), dry-run, Events
 internal/ledger      GitHub: Deployments, evidence comments, promotion PRs
 internal/promote     check / promote orchestration

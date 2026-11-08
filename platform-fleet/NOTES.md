@@ -170,38 +170,48 @@ needs higher inotify limits on Linux:
 
 ## In-cluster promoter (Phase 4)
 
-- `promoter serve` runs in every tier cluster (`platform-fleet/promoter/`),
-  checks only its own cluster (in-cluster config; it refuses any other cluster
-  name), and talks only to GitHub. Its identity comes from the
-  `flux-system/cluster-identity` ConfigMap (`CLUSTER_NAME`) that `task up`
-  creates per cluster, because several clusters of one tier share
-  `clusters/<tier>/`.
-- **Triggers.** A Flux `Alert` (generated from apps.yaml) sends each app's
-  Kustomization and HelmRelease events to a `generic-hmac` Provider; the
-  promoter verifies the HMAC and only acts on success reasons. Every
-  `RECHECK_INTERVAL` (10m) it re-evaluates every app, so a missed event only
-  delays things. Deviation: `generic-hmac` instead of `generic`, so nothing
-  else in the cluster can trigger promotions by POSTing to it.
-- **What it decides** (from GitHub, not memory, so restarts are safe): no gate
-  recorded for the digest main says this tier runs → gate; failed → retry
-  (2m after a new success event, else 30m); `in_progress` left by a crash →
-  retry after 15m; passed but next tier still behind → re-attempt the PR
-  every 6h; last tier → record only.
+- **An operator.** `promoter serve` is a controller-runtime operator for the
+  `PromotionGate` CRD (`platform.twallac10.io/v1alpha1`), deployed by
+  platform-fleet to every cluster (`promoter/`). One PromotionGate per app,
+  generated from apps.yaml; `kubectl -n promoter get pg` shows each app's
+  phase, version and reason in that cluster.
+- **Each tier attests for itself.** It checks only its own cluster (in-cluster
+  config; it refuses any other cluster name) and talks only to GitHub. Its
+  identity comes from the `flux-system/cluster-identity` ConfigMap
+  (`CLUSTER_NAME`) that `task up` creates per cluster, because several
+  clusters of one tier share `clusters/<tier>/`.
+- **Triggers.** It watches each app's Flux Kustomization and HelmRelease
+  (filtered to changes in applied revision, attempted config, or readiness)
+  and resyncs every gate every 10m. Deviation from the handoff: no Flux
+  notification Provider/Alert; watching directly needs no webhook, no shared
+  secret, and can't miss events.
+- **GitHub is authoritative; status is a mirror.** Decisions come from what
+  main declares for the tier and this cluster's latest gate Deployment, so
+  restarts are safe and a gate run from the CLI is picked up. The status adds
+  per-check results, the evidence URL, the PR and the timing used for retries:
+  new digest → gate; failed → retry 2m after Flux applies something new,
+  else every 30m; stale `in_progress` → 15m; passed but next tier behind →
+  retry the PR every 6h. While Flux isn't Ready it waits, but after 10m stuck
+  it gates anyway so the failure is recorded.
+- **Long reconciles.** A gate can take up to `maxWait` (5m); it runs inside
+  the reconcile, with 4 concurrent reconciles. Fine for a handful of apps;
+  for many apps, run gates as Jobs and reconcile on their completion.
 - **Read-only RBAC, with one twist.** Server-side dry-run needs `create`
   permission. The promoter has create on pods, HelmRepositories and
   OCIRepositories only for dry-run, and a ValidatingAdmissionPolicy
   (`promoter-dry-run-only`, native CEL, no Kyverno dependency) denies any
-  non-dry-run write by its ServiceAccount. Plus `create` on Events, and `get`
-  on the one Secret `monitoring/grafana` (separate Kustomization that waits
-  for kube-prometheus-stack).
+  non-dry-run write by its ServiceAccount. Writes otherwise: PromotionGate
+  status, Events, its leader-election Lease. Plus `get` on the one Secret
+  `monitoring/grafana` (separate Kustomization that waits for
+  kube-prometheus-stack).
 - **Chicken-and-egg.** The promoter is deployed by platform-fleet directly and
   is **not** gated: it is the thing that produces the evidence, so gating it
   with its own evidence proves nothing, and a broken promoter would block its
-  own fix. Its image is pinned by tag to `platform-promoter/VERSION`;
-  changes go through normal review of platform-promoter and platform-fleet.
-  It has no dependsOn so it is up before the apps it gates.
-- Secrets `promoter/promoter-github` (PROMOTER_TOKEN) and
-  `promoter/promoter-webhook` (random HMAC key) are created by `task up`,
+  own fix. Its image is pinned by tag to `platform-promoter/VERSION`; its CRD
+  is a checked copy of the one platform-promoter generates. Changes go
+  through normal review of platform-promoter and platform-fleet. It has no
+  dependsOn so it is up before the apps it gates.
+- Secret `promoter/promoter-github` (PROMOTER_TOKEN) is created by `task up`,
   never committed. The image package on GHCR must be public, like the charts.
 
 ## Trust assumptions

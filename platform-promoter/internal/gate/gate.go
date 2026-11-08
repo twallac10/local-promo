@@ -2,9 +2,9 @@
 // polls them until they have enough data to answer (bounded by a timeout,
 // never a fixed soak), and the resulting report.
 //
-// A Check is deliberately small so it can later be backed by something other
-// than in-process code, e.g. a HelmReleaseTest custom resource whose status a
-// check reads and translates into a Result.
+// A Check is deliberately small so it can be backed by something other than
+// in-process code, e.g. a custom resource whose status the check reads and
+// translates into a Result.
 package gate
 
 import (

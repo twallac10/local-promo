@@ -2,9 +2,9 @@
 // plus app-specific sets selected by name in apps.yaml (`checks: [kyverno]`).
 //
 // To add a check set: write constructors returning gate.Check and register
-// them in Sets below. A check set could also be backed by an external source
-// (e.g. a HelmReleaseTest custom resource): implement gate.Check by reading
-// that resource's status and mapping it to a gate.Result.
+// them in Sets below. A check could also be backed by an external source
+// (e.g. a custom resource): implement gate.Check by reading that resource's
+// status and mapping it to a gate.Result.
 package checks
 
 import (

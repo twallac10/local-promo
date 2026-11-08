@@ -29,9 +29,9 @@ const usage = `usage:
   promoter checks                                  list registered check sets
   promoter verify-pr --fleet <dir|url> [--repo r] [--dir .] [--main-ref origin/main] [--labels a,b]
                                                    CI guardrails for a PR (no cluster access)
-  promoter serve [--tier t --cluster c --listen :8080 --interval 10m]
-                                                   in-cluster: Flux webhook + periodic re-check
-                                                   (env TIER, CLUSTER_NAME, PROMOTER_TOKEN, WEBHOOK_TOKEN)
+  promoter serve [--tier t --cluster c --namespace promoter --resync 10m]
+                                                   in-cluster PromotionGate operator
+                                                   (env TIER, CLUSTER_NAME, PROMOTER_TOKEN, PROMOTER_FLEET)
 
 flags:
   --fleet <dir|url>   platform-fleet dir or raw URL with tiers.yaml/apps.yaml

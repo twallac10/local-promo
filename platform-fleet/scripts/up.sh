@@ -32,10 +32,6 @@ for tier in $(tiers); do
     else
       echo "warning: PROMOTER_TOKEN not set; the in-cluster promoter will not start on $ctx"
     fi
-    if ! k -n promoter get secret promoter-webhook >/dev/null 2>&1; then
-      k -n promoter create secret generic promoter-webhook \
-        --from-literal=token="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" >/dev/null
-    fi
 
     echo "== bootstrapping Flux on $ctx -> clusters/$tier"
     flux bootstrap github \

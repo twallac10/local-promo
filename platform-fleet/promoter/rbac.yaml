@@ -39,6 +39,13 @@ rules:
   - apiGroups: [admissionregistration.k8s.io]
     resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
     verbs: [get, list, watch]
+  # The operator's own API: read gates, write their status.
+  - apiGroups: [platform.twallac10.io]
+    resources: [promotiongates]
+    verbs: [get, list, watch]
+  - apiGroups: [platform.twallac10.io]
+    resources: [promotiongates/status]
+    verbs: [get, update, patch]
   - apiGroups: ["", events.k8s.io]
     resources: [events]
     verbs: [create]
@@ -60,6 +67,31 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: promoter-read
+subjects:
+  - kind: ServiceAccount
+    name: promoter
+    namespace: promoter
+---
+# Leader election (one active operator per cluster).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: promoter-leader-election
+  namespace: promoter
+rules:
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: promoter-leader-election
+  namespace: promoter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: promoter-leader-election
 subjects:
   - kind: ServiceAccount
     name: promoter

@@ -4,7 +4,7 @@
 #   fleet/apps/<app>.yaml           GitRepository + Kustomization (./tiers/${TIER})
 #   fleet/canary.yaml               Kustomization for ./canary
 #   fleet/promoter.yaml             in-cluster promoter (+ Grafana Secret access)
-#   promoter/alert.yaml             Flux Alert: app reconcile events -> promoter
+#   promoter/gates.yaml             one PromotionGate per app
 #   fleet/kustomization.yaml
 # Output is committed; `task lint` fails if it is stale. Adding a tier or an
 # app is: edit the YAML, run `task fleet:render`, commit.
@@ -167,27 +167,25 @@ spec:
     name: flux-system
 YAML
 
-# Flux tells the promoter when an app reconciled successfully.
+# One PromotionGate per app; identical in every cluster (tier and cluster
+# come from the operator's settings).
 {
-  cat <<YAML
-$hdr
-apiVersion: notification.toolkit.fluxcd.io/v1beta3
-kind: Alert
+  echo "$hdr"
+  first=1
+  for name in "${names[@]}"; do
+    [ $first -eq 1 ] || echo "---"
+    first=0
+    cat <<YAML
+apiVersion: platform.twallac10.io/v1alpha1
+kind: PromotionGate
 metadata:
-  name: promoter
+  name: $name
   namespace: promoter
 spec:
-  providerRef:
-    name: promoter
-  eventSeverity: info
-  eventSources:
+  app: $name
 YAML
-  for i in $(seq 0 $(( $(yq '.apps | length' apps.yaml) - 1 ))); do
-    name=$(yq ".apps[$i].name" apps.yaml); ns=$(yq ".apps[$i].namespace" apps.yaml)
-    printf '    - kind: Kustomization\n      namespace: flux-system\n      name: %s\n' "$name"
-    printf '    - kind: HelmRelease\n      namespace: %s\n      name: %s\n' "$ns" "$name"
   done
-} > promoter/alert.yaml
+} > promoter/gates.yaml
 
 {
   echo "$hdr"

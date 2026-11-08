@@ -10,5 +10,6 @@ helm template k kyverno --repo https://kyverno.github.io/kyverno --version 3.9.2
   | yq 'select(.kind=="CustomResourceDefinition")' > "$tmp/kyverno.yaml"
 helm pull kube-prometheus-stack --repo https://prometheus-community.github.io/helm-charts --version 93.0.0 --untar -d "$tmp"
 cat "$tmp"/kube-prometheus-stack/charts/crds/crds/*.yaml > "$tmp/prom.yaml"
-python3 "$here/scripts/crd2schema.py" "$out" "$tmp/flux.yaml" "$tmp/kyverno.yaml" "$tmp/prom.yaml"
+python3 "$here/scripts/crd2schema.py" "$out" "$tmp/flux.yaml" "$tmp/kyverno.yaml" "$tmp/prom.yaml" \
+  "$here/promoter/crd.yaml"
 touch "$out/.done"
