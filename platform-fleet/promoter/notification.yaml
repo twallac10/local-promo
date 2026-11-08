@@ -1,0 +1,13 @@
+# Flux notification Provider. generic-hmac signs each POST with the Secret's
+# `token` key as the HMAC key, sending `X-Signature: sha256=<hex>`.
+# The Alert (which events to forward) is generated from apps.yaml by render.sh.
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: promoter
+  namespace: promoter
+spec:
+  type: generic-hmac
+  address: http://promoter.promoter.svc.cluster.local:8080/hook
+  secretRef:
+    name: promoter-webhook

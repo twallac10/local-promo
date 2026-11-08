@@ -1,0 +1,33 @@
+# The promoter holds create on pods/helmrepositories/ocirepositories solely to
+# server-side dry-run them. This policy makes that a hard limit: any write by
+# the promoter's ServiceAccount that is not a dry-run is denied.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: promoter-dry-run-only
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [pods]
+      - apiGroups: [source.toolkit.fluxcd.io]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [helmrepositories, ocirepositories]
+  matchConditions:
+    - name: promoter-serviceaccount
+      expression: "request.userInfo.username == 'system:serviceaccount:promoter:promoter'"
+  validations:
+    - expression: "request.dryRun == true"
+      message: "the promoter may only dry-run"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: promoter-dry-run-only
+spec:
+  policyName: promoter-dry-run-only
+  validationActions: [Deny]
