@@ -1,0 +1,17 @@
+# Canary chart source. The canary is NOT promoted: same content in every tier.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: podinfo
+  namespace: canary
+  annotations:
+    platform.twallac10.io/chart-version: "6.17.0"
+spec:
+  interval: 10m
+  url: oci://ghcr.io/twallac10/charts/podinfo
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    # set by task charts:seed
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

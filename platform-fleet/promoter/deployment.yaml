@@ -1,0 +1,80 @@
+# Secret promoter-github (key: token) is created by
+# `task up` and never committed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: promoter
+  namespace: promoter
+  labels:
+    app.kubernetes.io/name: promoter
+    app.kubernetes.io/part-of: platform-promoter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: promoter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: promoter
+        app.kubernetes.io/part-of: platform-promoter
+    spec:
+      serviceAccountName: promoter
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: promoter
+          image: ghcr.io/twallac10/platform-promoter:v0.1.0
+          args: ["serve"]
+          env:
+            - name: TIER
+              value: "${TIER}"
+            - name: CLUSTER_NAME
+              value: "${CLUSTER_NAME}"
+            - name: PROMOTER_FLEET
+              value: https://raw.githubusercontent.com/twallac10/platform-fleet/main
+            - name: RESYNC_INTERVAL
+              value: "10m"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PROMOTER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: promoter-github
+                  key: token
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault

@@ -1,0 +1,65 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: podinfo
+  namespace: canary
+spec:
+  interval: 10m
+  releaseName: podinfo
+  chartRef:
+    kind: OCIRepository
+    name: podinfo
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  # podinfo's chart tests use an unpinned image (giantswarm/tiny-tools), so they
+  # stay off; the gate checks the canary through Prometheus and the collector.
+  test:
+    enable: false
+  values:
+    replicaCount: 1
+    image:
+      repository: ghcr.io/stefanprodan/podinfo
+      tag: 6.17.0
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    # Prometheus scrape: ServiceMonitor on the http port (9898, /metrics).
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+    # Tracing/log export. podinfo only enables OTel when --otel-service-name is set;
+    # its exporters are OTLP gRPC (otlptracegrpc / otlploggrpc), so use the collector's
+    # gRPC port 4317. An http:// scheme makes the Go gRPC exporter use plaintext.
+    extraArgs:
+      - --otel-service-name=canary-podinfo
+    extraEnvs:
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://otel-collector.otel.svc.cluster.local:4317
+      - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+        value: http://otel-collector.otel.svc.cluster.local:4317
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: grpc
+    # baseline + restricted Pod Security compliant
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL

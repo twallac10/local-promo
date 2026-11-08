@@ -1,0 +1,9 @@
+# Upstream chart to mirror into oci://ghcr.io/twallac10/charts/<name>.
+# Changing `version` on main runs .github/workflows/mirror.yaml, which pushes the
+# chart to GHCR and opens the entry PR for the first tier in tiers.yaml.
+name: kube-prometheus-stack
+source:
+  type: http            # http | oci | local
+  repo: https://prometheus-community.github.io/helm-charts
+  chart: kube-prometheus-stack
+version: 93.0.0

@@ -1,0 +1,42 @@
+# Platform apps: one deployment repo each, all created from platform-app-template.
+# The promoter and the Taskfile use this to know where to open PRs, record
+# Deployments and create Environments. `task fleet:render` turns it into
+# fleet/apps/<name>.yaml (GitRepository + Kustomization per app).
+owner: twallac10
+# Evidence gate thresholds (promoter). No soak time: checks wait only until
+# they have enough data to answer, at most maxWait each.
+gate:
+  maxWait: 5m           # per check
+  pollInterval: 10s
+  minScrapes: 3         # successful canary scrapes since the release went Ready
+  sampleInterval: 30s   # min gap between two counter samples
+apps:
+  - name: kyverno
+    repo: platform-kyverno
+    namespace: kyverno
+    dependsOn: []
+    checks: [kyverno]   # plus the common checks
+  - name: guardrails          # promoted like any other app (chart built from source)
+    repo: platform-guardrails
+    namespace: guardrails
+    dependsOn: [kyverno]
+    checks: [guardrails]   # plus the common checks
+  - name: kyverno-policies
+    repo: platform-kyverno-policies
+    namespace: kyverno-policies
+    dependsOn: [kyverno]
+    checks: [kyverno-policies]   # plus the common checks
+  - name: kube-prometheus-stack
+    repo: platform-kube-prometheus-stack
+    namespace: monitoring
+    dependsOn: [guardrails, kyverno-policies]
+    checks: [kube-prometheus-stack]   # plus the common checks
+  - name: otel-collector
+    repo: platform-otel-collector
+    namespace: otel
+    dependsOn: [kube-prometheus-stack]   # ships a ServiceMonitor
+    checks: [otel-collector]   # plus the common checks
+# Not promoted; lives in platform-fleet/canary and is identical in every tier.
+canary:
+  namespace: canary
+  dependsOn: [kyverno-policies, guardrails, kube-prometheus-stack, otel-collector]

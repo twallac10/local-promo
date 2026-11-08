@@ -1,0 +1,23 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: otel-collector
+  namespace: otel
+spec:
+  interval: 10m
+  releaseName: otel-collector
+  chartRef:
+    kind: OCIRepository
+    name: otel-collector
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  test:
+    enable: true
+    ignoreFailures: false

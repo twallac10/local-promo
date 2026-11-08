@@ -1,0 +1,26 @@
+# The one Secret the promoter reads: Grafana admin credentials, used to call
+# Grafana's own read APIs. Applied after kube-prometheus-stack (namespace exists).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: promoter-read-grafana
+  namespace: monitoring
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [grafana]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: promoter-read-grafana
+  namespace: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: promoter-read-grafana
+subjects:
+  - kind: ServiceAccount
+    name: promoter
+    namespace: promoter

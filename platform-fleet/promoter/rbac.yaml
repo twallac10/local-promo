@@ -1,0 +1,98 @@
+# Read-only access to exactly what the evidence checks look at, plus the
+# creates needed for server-side dry-run (see dryrun-only.yaml: a
+# ValidatingAdmissionPolicy denies every non-dry-run write by this account) and
+# Events. Secrets are NOT granted here; see promoter-monitoring/.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promoter-read
+  labels:
+    app.kubernetes.io/part-of: platform-promoter
+rules:
+  - apiGroups: [kustomize.toolkit.fluxcd.io]
+    resources: [kustomizations]
+    verbs: [get, list, watch]
+  - apiGroups: [helm.toolkit.fluxcd.io]
+    resources: [helmreleases]
+    verbs: [get, list, watch]
+  - apiGroups: [source.toolkit.fluxcd.io]
+    resources: [ocirepositories]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods, services, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch]
+  - apiGroups: [policies.kyverno.io]
+    resources: [validatingpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [kyverno.io]
+    resources: [clusterpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [wgpolicyk8s.io]
+    resources: [policyreports]
+    verbs: [get, list, watch]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
+    verbs: [get, list, watch]
+  # The operator's own API: read gates, write their status.
+  - apiGroups: [platform.twallac10.io]
+    resources: [promotiongates]
+    verbs: [get, list, watch]
+  - apiGroups: [platform.twallac10.io]
+    resources: [promotiongates/status]
+    verbs: [get, update, patch]
+  - apiGroups: ["", events.k8s.io]
+    resources: [events]
+    verbs: [create]
+  # Dry-run only (enforced by the promoter-dry-run-only ValidatingAdmissionPolicy).
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create]
+  - apiGroups: [source.toolkit.fluxcd.io]
+    resources: [helmrepositories, ocirepositories]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promoter-read
+  labels:
+    app.kubernetes.io/part-of: platform-promoter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promoter-read
+subjects:
+  - kind: ServiceAccount
+    name: promoter
+    namespace: promoter
+---
+# Leader election (one active operator per cluster).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: promoter-leader-election
+  namespace: promoter
+rules:
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: promoter-leader-election
+  namespace: promoter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: promoter-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: promoter
+    namespace: promoter

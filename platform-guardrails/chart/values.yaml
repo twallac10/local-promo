@@ -1,0 +1,7 @@
+# -- Actions for every guardrail policy: `Deny`, `Audit`, `Warn` (any combination).
+# Tiers may relax this (for example [Audit]) in tiers/<tier>/tier.yaml.
+validationActions:
+  - Deny
+
+# -- Only OCIRepository URLs starting with this prefix are admitted.
+allowedOCIPrefix: "oci://ghcr.io/twallac10/charts/"

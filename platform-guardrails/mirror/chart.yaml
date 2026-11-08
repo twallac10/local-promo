@@ -1,0 +1,9 @@
+# Chart to mirror into oci://ghcr.io/twallac10/charts/<name>.
+# Changing `version` on main runs .github/workflows/mirror.yaml, which pushes the
+# chart to GHCR and opens the entry PR for the first tier in tiers.yaml.
+# This app builds its chart from source in chart/ (Chart.yaml version must match).
+name: guardrails
+source:
+  type: local           # http | oci | local
+  path: chart
+version: 0.1.0

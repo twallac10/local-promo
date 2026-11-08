@@ -1,0 +1,30 @@
+# PROMOTABLE. A promotion copies this file unchanged from tier N-1 to tier N.
+# Only the chart digest, image tags and settings shared by every tier go here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: kyverno-policies
+  namespace: kyverno-policies
+  annotations:
+    platform.twallac10.io/chart-version: "3.9.2"
+spec:
+  ref:
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kyverno-policies
+  namespace: kyverno-policies
+spec:
+  values:
+    # The policy SET is promotable: same policies, same exclusions in every tier.
+    policyType: ValidatingPolicy      # CEL policies.kyverno.io (chart default, pinned explicitly)
+    podSecurityStandard: baseline
+    failurePolicy: Fail
+    validationAllowExistingViolations: true
+    # Platform namespaces that legitimately run privileged/host-network pods.
+    vpolExclude:
+      excludeNamespaces:
+        - kube-system
+        - local-path-storage

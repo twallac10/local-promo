@@ -1,0 +1,22 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-ocirepository-url
+  labels: {{ include "guardrails.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict OCIRepository URL
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/description: >-
+      OCIRepository spec.url must start with the approved registry prefix.
+spec:
+  validationActions: {{ toYaml .Values.validationActions | nindent 4 }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["source.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [ocirepositories]
+  validations:
+    - expression: >-
+        has(object.spec.url) && object.spec.url.startsWith({{ .Values.allowedOCIPrefix | toJson }})
+      message: "OCIRepository spec.url must start with {{ .Values.allowedOCIPrefix }}."

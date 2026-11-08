@@ -1,0 +1,80 @@
+# Mirror the chart pinned in mirror/chart.yaml into GHCR, then open the entry
+# PR that points the first tier (from platform-fleet/tiers.yaml) at the new digest.
+# This file is identical in every app repo (it comes from platform-app-template).
+name: mirror
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - mirror/chart.yaml
+      - chart/**            # only exists in repos that build their chart from source
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+env:
+  OWNER: ${{ github.repository_owner }}
+  FLEET_TIERS_URL: https://raw.githubusercontent.com/${{ github.repository_owner }}/platform-fleet/main/tiers.yaml
+  HELM_VERSION: v3.16.3
+
+jobs:
+  mirror:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Mirror chart to GHCR
+        id: mirror
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          out=$(./scripts/mirror-chart.sh "$OWNER")
+          echo "$out"
+          echo "digest=$(sed -n 's/^digest=//p' <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -n 's/^version=//p' <<<"$out")" >> "$GITHUB_OUTPUT"
+
+      - name: Open entry PR for the first tier
+        env:
+          # PRs opened with GITHUB_TOKEN do not trigger other workflows, so the
+          # promotion guardrails would never run. Use the promoter's token.
+          GH_TOKEN: ${{ secrets.PROMOTER_TOKEN }}
+          DIGEST: ${{ steps.mirror.outputs.digest }}
+          VERSION: ${{ steps.mirror.outputs.version }}
+        run: |
+          set -euo pipefail
+          tier=$(curl -fsSL "$FLEET_TIERS_URL" | yq '.tiers[0].name')
+          file="tiers/$tier/release.yaml"
+          current=$(yq 'select(.kind == "OCIRepository") | .spec.ref.digest' "$file")
+          if [ "$current" = "$DIGEST" ]; then
+            echo "$file already at $DIGEST; nothing to do"; exit 0
+          fi
+          ./scripts/set-digest.sh "$file" "$DIGEST" "$VERSION"
+          short=${DIGEST#sha256:}; short=${short:0:12}
+          branch="promote/$tier/$short"
+          git config user.name "platform-mirror"
+          git config user.email "platform-mirror@users.noreply.github.com"
+          git switch -c "$branch"
+          git add "$file"
+          git commit -m "promote($tier): $(yq '.name' mirror/chart.yaml) $VERSION ($short)"
+          git push -f origin "$branch"
+          gh label create promotion --color 1D76DB --description "Automated tier promotion" 2>/dev/null || true
+          body=$(printf 'Entry into the promotion chain.\n\n| field | value |\n|---|---|\n| chart | `oci://ghcr.io/%s/charts/%s` |\n| version | `%s` |\n| digest | `%s` |\n| source | mirror of `%s` |\n' \
+            "$OWNER" "$(yq '.name' mirror/chart.yaml)" "$VERSION" "$DIGEST" "$(yq '.source.repo // .source.path' mirror/chart.yaml)")
+          gh pr create --base main --head "$branch" --label promotion \
+            --title "promote($tier): $(yq '.name' mirror/chart.yaml) $VERSION" --body "$body" \
+            || gh pr edit "$branch" --body "$body"
+          # Merges itself once the required promotion-gate check passes.
+          gh pr merge "$branch" --auto --squash

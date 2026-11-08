@@ -1,0 +1,25 @@
+# Thin caller of the shared promotion guardrails (platform-promoter). Runs on
+# every PR so branch protection can require `promotion / promotion-gate`;
+# non-promotion PRs only get the OCI-only and secret checks.
+# Identical in every app repo (from platform-app-template).
+name: promotion
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  deployments: read
+  pull-requests: read
+
+concurrency:
+  group: promotion-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  promotion:
+    uses: twallac10/platform-promoter/.github/workflows/guardrails.yaml@v0.1.0
+    with:
+      promoter-ref: v0.1.0

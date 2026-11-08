@@ -1,0 +1,8 @@
+# TIER-ONLY (prd). Never promoted: replicas, resources, retention, hostnames, enforcement mode.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: __APP__
+  namespace: __APP__
+spec:
+  values: {}
