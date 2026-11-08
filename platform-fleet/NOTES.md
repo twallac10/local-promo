@@ -85,11 +85,11 @@ Estimate per cluster, from requests (to be replaced with measured numbers from
 |---|---|
 | kind node (control plane, etcd, kubelet, CNI) | 700 |
 | Flux (4 controllers) | 250 |
-| kyverno (4 controllers, 1 replica each) | 400 |
-| kube-prometheus-stack (prometheus, grafana, operator, ksm) | 650 |
+| kyverno (admission + reports controllers) | 250 |
+| prometheus (single server) | 200–512 |
 | otel-collector | 64–256 |
 | canary | 50 |
-| **total** | **~2.2–2.5 GiB** |
+| **total** | **~1.6–2 GiB** (estimate after the switch to plain Prometheus; was 2.2–2.9 GiB measured with kube-prometheus-stack) |
 
 Three clusters ≈ 7–8 GiB. Give Docker **12 GiB**. kind with 3 clusters also
 needs higher inotify limits on Linux:
@@ -115,9 +115,8 @@ needs higher inotify limits on Linux:
   pending and re-asked; it becomes a failure with the same reason at `maxWait`.
   Things that cannot improve by waiting (HelmRelease `UpgradeFailed`, rule
   evaluation failures, a known-good pod denied) fail immediately.
-- **Reads one Secret.** The Grafana datasource/dashboard checks need the admin
-  login from `monitoring/grafana`. Everything else is read-only plus
-  server-side dry-run creates and Event creates.
+- **Reads no Secrets.** Read-only plus server-side dry-run creates and Event
+  creates. (The Grafana checks, which read its admin Secret, went with Grafana.)
 - **OTel "from the canary".** Collector self-metrics don't label by client;
   the canary is the only span producer in the demo, so accepted-spans growth is
   attributed to it. In a real fleet use spanmetrics or a per-tenant pipeline.
@@ -201,9 +200,7 @@ needs higher inotify limits on Linux:
   OCIRepositories only for dry-run, and a ValidatingAdmissionPolicy
   (`promoter-dry-run-only`, native CEL, no Kyverno dependency) denies any
   non-dry-run write by its ServiceAccount. Writes otherwise: PromotionGate
-  status, Events, its leader-election Lease. Plus `get` on the one Secret
-  `monitoring/grafana` (separate Kustomization that waits for
-  kube-prometheus-stack).
+  status, Events, its leader-election Lease.
 - **Chicken-and-egg.** The promoter is deployed by platform-fleet directly and
   is **not** gated: it is the thing that produces the evidence, so gating it
   with its own evidence proves nothing, and a broken promoter would block its
@@ -219,16 +216,16 @@ needs higher inotify limits on Linux:
 Run after `task up` (and `task gh:envs`); `task demo:reset` between scenarios
 restores every repo to the workspace baseline and closes open promotion PRs.
 
-- `task demo:good`: PR bumping kube-prometheus-stack's `mirror/chart.yaml`
-  to 92.22.0 (same operator version as 92.21.2; values validated against it) →
+- `task demo:good`: PR bumping the Prometheus chart's `mirror/chart.yaml`
+  from 29.45.0 to 29.45.1 (both Prometheus v3.16.0; values validated) →
   mirror workflow → dev entry PR (auto-merge) → dev gate → stg PR
   (auto-merge) → stg gate → prd PR waiting for environment approval. The
   script follows each step and stops at the approval.
 - `task demo:ready-but-broken`: a shared-value change in dev's release.yaml
-  makes Prometheus select only ServiceMonitors labelled
-  `platform.twallac10.io/scrape=opt-in`. It renders fine, passes CI (valid,
-  same digest), the HelmRelease goes Ready, and the canary target silently
-  disappears. The dev gate waits for canary scrapes, fails at `maxWait` with
+  limits Prometheus pod discovery to "platform namespaces" (a `keep` relabel
+  on kube-system|prometheus|otel|kyverno). It renders fine, passes promtool
+  and CI (valid, same digest), the HelmRelease goes Ready, and the canary
+  target silently disappears. The dev gate waits for canary scrapes, fails at `maxWait` with
   "canary target not discovered", records a failed Deployment and a
   `PromotionGateFailed` Event, and no stg PR is opened. Takes about maxWait
   (5m) after Flux applies it.
@@ -243,6 +240,27 @@ restores every repo to the workspace baseline and closes open promotion PRs.
   record the commit that last changed the tier's release.yaml; the operator
   re-gates when it changes, and `promote`/CI require the source tier's success
   for that exact commit (CI: "gated release commit … not gated yet").
+
+## Lighter apps (after the first live run)
+
+- **kube-prometheus-stack → plain Prometheus** (`platform-prometheus`, chart
+  `prometheus` 29.45.0): one server, no operator/CRDs, no Grafana,
+  Alertmanager, node-exporter or kube-state-metrics. It scrapes itself and pods
+  annotated `prometheus.io/scrape: "true"` (canary podinfo on 9898, OTel
+  Collector self-metrics on 8888); the node/cAdvisor/service jobs are off. One
+  recording rule gives the rule-evaluation check something to evaluate.
+- Gate set `prometheus`: ready, canary scraped (`job="kubernetes-pods"`), all
+  targets up, no rule evaluation failures. The two Grafana checks are gone.
+- **Deviation from the handoff:** no Grafana, so `task grafana -- <tier>` is
+  now `task prometheus -- <tier>` (Prometheus UI). Grafana can come back as its
+  own small app if wanted.
+- **Kyverno stays** (policies are the point), with only its admission and
+  reports controllers.
+- `task lint` runs `promtool check config` on each tier's rendered config
+  (with docker), next to the OTel `validate`.
+- The old `platform-kube-prometheus-stack` repo is no longer in apps.yaml;
+  archive it on GitHub. Flux prunes its objects from clusters that still have
+  them.
 
 ## Architectures (first live run, Apple Silicon)
 

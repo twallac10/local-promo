@@ -20,7 +20,8 @@ metadata:
     platform.twallac10.io/app: otel-collector
 spec:
   dependsOn:
-    - name: kube-prometheus-stack
+    - name: guardrails
+    - name: kyverno-policies
   interval: 10m
   retryInterval: 1m
   timeout: 10m

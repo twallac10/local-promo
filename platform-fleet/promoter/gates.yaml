@@ -26,10 +26,10 @@ spec:
 apiVersion: platform.twallac10.io/v1alpha1
 kind: PromotionGate
 metadata:
-  name: kube-prometheus-stack
+  name: prometheus
   namespace: promoter
 spec:
-  app: kube-prometheus-stack
+  app: prometheus
 ---
 apiVersion: platform.twallac10.io/v1alpha1
 kind: PromotionGate

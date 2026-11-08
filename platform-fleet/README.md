@@ -17,7 +17,7 @@ repos through Flux.
 
 Repos: [platform-app-template](https://github.com/twallac10/platform-app-template),
 platform-kyverno, platform-kyverno-policies, platform-guardrails,
-platform-kube-prometheus-stack, platform-otel-collector, platform-promoter.
+platform-prometheus, platform-otel-collector, platform-promoter.
 
 ## Prereqs
 
@@ -46,7 +46,7 @@ task repos:push       # commit the digests, tag platform-promoter (VERSION)
 PROMOTER_TOKEN=... task gh:envs   # environments, branch protection, auto-merge, secret
 GITHUB_TOKEN=... PROMOTER_TOKEN=... task up   # kind clusters, Flux bootstrap, promoter Secret per cluster
 task status
-task grafana -- dev
+task prometheus -- dev
 task check -- --app kyverno --tier dev        # evidence table + dev Deployment
 task promote -- --app kyverno --from dev      # gate dev, open the stg PR (auto-merges)
 task down
@@ -55,7 +55,7 @@ task down
 ## Demo scenarios
 
 ```sh
-task demo:good               # chart bump flows dev -> stg -> prd PR awaiting approval
+task demo:good               # Prometheus chart bump flows dev -> stg -> prd PR awaiting approval
 task demo:reset
 task demo:ready-but-broken   # HelmRelease Ready, gate blocks it in dev: canary not scraped
 task demo:reset

@@ -1,0 +1,16 @@
+# TIER-ONLY (prd). Never promoted: replicas, resources, retention, hostnames, enforcement mode.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus
+  namespace: prometheus
+spec:
+  values:
+    server:
+      retention: 24h
+      resources:
+        requests:
+          cpu: 50m
+          memory: 200Mi
+        limits:
+          memory: 512Mi

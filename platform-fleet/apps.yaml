@@ -26,17 +26,17 @@ apps:
     namespace: kyverno-policies
     dependsOn: [kyverno]
     checks: [kyverno-policies]   # plus the common checks
-  - name: kube-prometheus-stack
-    repo: platform-kube-prometheus-stack
-    namespace: monitoring
+  - name: prometheus          # one Prometheus server, pod-annotation discovery (no operator/Grafana)
+    repo: platform-prometheus
+    namespace: prometheus
     dependsOn: [guardrails, kyverno-policies]
-    checks: [kube-prometheus-stack]   # plus the common checks
+    checks: [prometheus]   # plus the common checks
   - name: otel-collector
     repo: platform-otel-collector
     namespace: otel
-    dependsOn: [kube-prometheus-stack]   # ships a ServiceMonitor
+    dependsOn: [guardrails, kyverno-policies]
     checks: [otel-collector]   # plus the common checks
 # Not promoted; lives in platform-fleet/canary and is identical in every tier.
 canary:
   namespace: canary
-  dependsOn: [kyverno-policies, guardrails, kube-prometheus-stack, otel-collector]
+  dependsOn: [kyverno-policies, guardrails, prometheus, otel-collector]

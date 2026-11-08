@@ -37,5 +37,5 @@ The chart has no images and no Helm tests.
   `!(request.namespace in ['kube-system', 'local-path-storage'])` on each policy.
 - Why: kind's kube-proxy and kindnet (kube-system, hostNetwork/privileged/hostPath) and local-path-provisioner
   (local-path-storage) would be denied by baseline on restart in prd. Existing pods are not re-admitted, but restarts
-  and rollouts are. kube-prometheus-stack runs with node-exporter disabled, so it needs no exclusion.
+  and rollouts are. Prometheus runs without node-exporter, so it needs no exclusion.
 - Policies only match Pods (CREATE/UPDATE) and `validationAllowExistingViolations: true` keeps existing objects admissible.

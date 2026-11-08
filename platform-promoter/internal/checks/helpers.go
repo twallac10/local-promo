@@ -16,10 +16,10 @@ import (
 	"github.com/twallac10/platform-promoter/internal/gate"
 )
 
-// Prometheus from kube-prometheus-stack (fullnameOverride: kps).
+// Prometheus (prometheus-community/prometheus, server.fullnameOverride: prometheus).
 const (
-	PromNamespace = "monitoring"
-	PromService   = "kps-prometheus"
+	PromNamespace = "prometheus"
+	PromService   = "prometheus"
 	PromPort      = 9090
 )
 

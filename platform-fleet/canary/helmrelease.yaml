@@ -34,7 +34,7 @@ spec:
         memory: 64Mi
     # Prometheus scrape: ServiceMonitor on the http port (9898, /metrics).
     serviceMonitor:
-      enabled: true
+      enabled: false
       interval: 15s
     # Tracing/log export. podinfo only enables OTel when --otel-service-name is set;
     # its exporters are OTLP gRPC (otlptracegrpc / otlploggrpc), so use the collector's
@@ -63,3 +63,7 @@ spec:
       capabilities:
         drop:
           - ALL
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9898"
+      prometheus.io/path: /metrics

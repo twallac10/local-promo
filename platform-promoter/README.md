@@ -51,7 +51,7 @@ cluster); the operator's tier and cluster come from its env.
 $ kubectl -n promoter get promotiongates
 NAME                    APP                     TIER  VERSION  PHASE     MESSAGE
 kyverno                 kyverno                 dev   3.9.3    Passed    promotion PR opened: https://github.com/...
-kube-prometheus-stack   kube-prometheus-stack   dev   93.0.1   Failed    1 failed: canary scraped: no answer within 5m0s: canary target not discovered
+prometheus              prometheus              dev   29.45.0  Failed    1 failed: canary scraped since Ready: no answer within 5m0s: canary target not discovered
 ```
 
 - **Watches** the app's Flux Kustomization (`flux-system/<app>`) and
@@ -100,7 +100,7 @@ Every app gets the common checks; `checks:` in apps.yaml adds app sets.
 | kyverno | webhooks registered with ready endpoints · all policies Ready · dry-run: known-good pod admitted, privileged pod denied (Deny) / admitted (Audit) · canary PolicyReport failures not above baseline |
 | kyverno-policies | chart policies Ready · enforcement mode matches the HelmRelease · privileged pod denied/admitted per mode |
 | guardrails | guard policies Ready · dry-run: HelmRepository denied, foreign OCIRepository denied, GHCR OCIRepository admitted |
-| kube-prometheus-stack | Prometheus ready · canary scraped ≥ `minScrapes` times since Ready and up · all targets up · no rule evaluation failures · Grafana health + datasource health · a known dashboard query returns data |
+| prometheus | Prometheus ready · canary scraped ≥ `minScrapes` times since Ready and up · all targets up · no rule evaluation failures |
 | otel-collector | collector Deployment available · accepted spans increasing · export failures not increasing (two samples ≥ `sampleInterval` apart) |
 
 ### Adding a check

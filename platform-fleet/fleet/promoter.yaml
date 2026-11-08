@@ -21,22 +21,3 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-identity
----
-# Lets the promoter read the Grafana admin Secret (one Secret, by name), once
-# kube-prometheus-stack has created the monitoring namespace.
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: promoter-monitoring
-  namespace: flux-system
-spec:
-  dependsOn:
-    - name: promoter
-    - name: kube-prometheus-stack
-  interval: 10m
-  retryInterval: 1m
-  path: ./promoter-monitoring
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: flux-system

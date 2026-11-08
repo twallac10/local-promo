@@ -7,7 +7,7 @@ gates have something real to check.
 | Platform app | What the canary proves |
 |---|---|
 | Kyverno / Pod Security | podinfo and loadgen are admitted under baseline Enforce (and are restricted-compliant) |
-| kube-prometheus-stack | ServiceMonitor `canary/podinfo` is scraped: `up{namespace="canary",service="podinfo"} == 1` (job `podinfo`) |
+| prometheus | podinfo pod (annotated `prometheus.io/scrape: "true"`, port 9898) is scraped: `up{namespace="canary",job="kubernetes-pods",app_kubernetes_io_name="podinfo"} == 1` |
 | OpenTelemetry Collector | podinfo exports OTLP gRPC traces/logs to `otel-collector.otel.svc.cluster.local:4317` (service name `canary-podinfo`) |
 | Flux | HelmRelease `canary/podinfo` Ready, `helm test` passes |
 
@@ -19,8 +19,8 @@ The chart digest in `ocirepository.yaml` is a placeholder set by `task charts:se
 
 ```sh
 flux get hr -n canary podinfo
-kubectl -n canary get pods,servicemonitor
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 &
+kubectl -n canary get pods
+kubectl -n prometheus port-forward svc/prometheus 9090 &
 curl -s 'localhost:9090/api/v1/query?query=up{namespace="canary",service="podinfo"}'
 kubectl -n canary logs deploy/podinfo | head          # no OTLP export errors
 kubectl -n otel logs deploy/otel-collector | grep canary-podinfo

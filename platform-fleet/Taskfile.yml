@@ -57,7 +57,7 @@ tasks:
       - ./scripts/repos.sh shape
       - ./scripts/lint-fleet.sh
       - ./scripts/validate-apps.sh
-      - ./scripts/validate-otel.sh
+      - ./scripts/validate-configs.sh
 
   images:check:
     desc: "Every rendered image exists for linux/amd64 and linux/arm64 (network; task images:check -- <tier>)"
@@ -76,9 +76,9 @@ tasks:
     desc: Flux status per tier, then the latest gate Deployment per app per tier
     cmds: [./scripts/status.sh]
 
-  grafana:
-    desc: "Open a tier's Grafana: task grafana -- dev"
-    cmds: ["./scripts/grafana.sh {{.CLI_ARGS}}"]
+  prometheus:
+    desc: "Open a tier's Prometheus UI: task prometheus -- dev"
+    cmds: ["./scripts/prometheus.sh {{.CLI_ARGS}}"]
 
   # --- promotion (later phases) ---------------------------------------------
   promoter:build:
@@ -102,7 +102,7 @@ tasks:
     cmds: [./scripts/gh-envs.sh]
   # --- demo scenarios (after task up; run task demo:reset between them) ---
   demo:good:
-    desc: "kube-prometheus-stack version bump flows tier by tier to a prd PR awaiting approval (DEMO_KPS_VERSION, default 92.22.0)"
+    desc: "Prometheus chart bump flows tier by tier to a prd PR awaiting approval (DEMO_PROM_VERSION, default 29.45.1)"
     cmds: [./scripts/demo/good.sh]
   demo:ready-but-broken:
     desc: "A values change drops the canary scrape target: HelmRelease Ready, gate blocks it in the first tier"

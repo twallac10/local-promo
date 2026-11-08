@@ -1,0 +1,72 @@
+# PROMOTABLE. A promotion copies this file unchanged from tier N-1 to tier N.
+# Only the chart digest, image tags and settings shared by every tier go here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: prometheus
+  namespace: prometheus
+  annotations:
+    platform.twallac10.io/chart-version: "29.45.0"
+spec:
+  ref:
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus
+  namespace: prometheus
+spec:
+  values:
+    # One Prometheus server; no operator, Alertmanager, exporters or Grafana.
+    alertmanager:
+      enabled: false
+    kube-state-metrics:
+      enabled: false
+    prometheus-node-exporter:
+      enabled: false
+    prometheus-pushgateway:
+      enabled: false
+    server:
+      fullnameOverride: prometheus
+      image:
+        tag: v3.16.0
+      service:
+        servicePort: 9090
+      persistentVolume:
+        enabled: false
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+    configmapReload:
+      prometheus:
+        image:
+          tag: v0.94.2   # v0.95.1 (chart default) is published amd64-only
+    # Scrape only Prometheus itself and pods annotated prometheus.io/scrape=true
+    # (the canary, the OTel Collector). The node/cAdvisor/service jobs are the
+    # expensive ones and nothing here needs them.
+    scrapeConfigs:
+      kubernetes-api-servers:
+        enabled: false
+      kubernetes-nodes:
+        enabled: false
+      kubernetes-nodes-cadvisor:
+        enabled: false
+      kubernetes-service-endpoints:
+        enabled: false
+      kubernetes-service-endpoints-slow:
+        enabled: false
+      kubernetes-services:
+        enabled: false
+      kubernetes-pods-slow:
+        enabled: false
+      prometheus-pushgateway:
+        enabled: false
+    # One small recording rule, so "no rule evaluation failures" has something to evaluate.
+    serverFiles:
+      recording_rules.yml:
+        groups:
+          - name: canary
+            rules:
+              - record: canary:up:sum
+                expr: sum(up{namespace="canary"})

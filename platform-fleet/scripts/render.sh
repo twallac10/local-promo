@@ -3,7 +3,7 @@
 #   clusters/<tier>/platform.yaml   root Kustomization for ./fleet with TIER=<tier>
 #   fleet/apps/<app>.yaml           GitRepository + Kustomization (./tiers/${TIER})
 #   fleet/canary.yaml               Kustomization for ./canary
-#   fleet/promoter.yaml             in-cluster promoter (+ Grafana Secret access)
+#   fleet/promoter.yaml             in-cluster promoter
 #   promoter/gates.yaml             one PromotionGate per app
 #   fleet/kustomization.yaml
 # Output is committed; `task lint` fails if it is stale. Adding a tier or an
@@ -146,25 +146,6 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-identity
----
-# Lets the promoter read the Grafana admin Secret (one Secret, by name), once
-# kube-prometheus-stack has created the monitoring namespace.
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: promoter-monitoring
-  namespace: flux-system
-spec:
-  dependsOn:
-    - name: promoter
-    - name: kube-prometheus-stack
-  interval: 10m
-  retryInterval: 1m
-  path: ./promoter-monitoring
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
 YAML
 
 # One PromotionGate per app; identical in every cluster (tier and cluster

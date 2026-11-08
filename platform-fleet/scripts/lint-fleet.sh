@@ -19,7 +19,6 @@ for tier in $(tiers); do
   ctx=$(tier_contexts "$tier" | head -1)
   kustomize build "$FLEET_DIR/promoter" | sed "s|\${TIER}|$tier|g; s|\${CLUSTER_NAME}|$ctx|g" | kc -skip CustomResourceDefinition
 done
-kustomize build "$FLEET_DIR/promoter-monitoring" | kc
 # The promoter image must be the released VERSION.
 v=$(cat "$WORKSPACE/platform-promoter/VERSION")
 grep -q "image: ghcr.io/$OWNER/platform-promoter:$v\$" "$FLEET_DIR/promoter/deployment.yaml" \

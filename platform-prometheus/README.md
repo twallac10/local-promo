@@ -1,6 +1,6 @@
-# kube-prometheus-stack
+# prometheus
 
-Deployment repo for the `kube-prometheus-stack` platform app. Created from
+Deployment repo for the `prometheus` platform app. Created from
 [platform-app-template](https://github.com/twallac10/platform-app-template) by
 `task repos:create` in platform-fleet; keep the shape identical to the template.
 
@@ -14,7 +14,7 @@ Deployment repo for the `kube-prometheus-stack` platform app. Created from
 | `scripts/` | Used by the workflows and by `task charts:seed` | |
 
 Flux in each tier's cluster applies `./tiers/<tier>` from this repo (see
-platform-fleet `fleet/apps/kube-prometheus-stack.yaml`).
+platform-fleet `fleet/apps/prometheus.yaml`).
 
 ## Changing things
 

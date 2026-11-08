@@ -10,7 +10,7 @@ spec:
   dependsOn:
     - name: kyverno-policies
     - name: guardrails
-    - name: kube-prometheus-stack
+    - name: prometheus
     - name: otel-collector
   interval: 10m
   retryInterval: 1m

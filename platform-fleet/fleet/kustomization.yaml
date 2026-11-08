@@ -5,7 +5,7 @@ resources:
   - apps/kyverno.yaml
   - apps/guardrails.yaml
   - apps/kyverno-policies.yaml
-  - apps/kube-prometheus-stack.yaml
+  - apps/prometheus.yaml
   - apps/otel-collector.yaml
   - canary.yaml
   - promoter.yaml
