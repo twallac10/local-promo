@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: promoter
-          image: ghcr.io/twallac10/platform-promoter:v0.1.5
+          image: ghcr.io/twallac10/platform-promoter:v0.1.6
           args: ["serve"]
           env:
             - name: TIER
