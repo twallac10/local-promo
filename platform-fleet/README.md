@@ -23,7 +23,7 @@ platform-kube-prometheus-stack, platform-otel-collector, platform-promoter.
 
 docker (≥ 12 GiB memory for the engine, see NOTES.md), kind v0.31.0, kubectl,
 flux v2.10.0, helm v3.16+, gh (authenticated), jq, task, yq v4 (mikefarah), kustomize,
-kubeconform, python3 with PyYAML, rsync, go.
+kubeconform, python3 (standard library only), rsync, go.
 
 Tokens (separate, least privilege, never committed):
 

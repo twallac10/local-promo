@@ -23,7 +23,6 @@ tasks:
         for t in docker kind kubectl flux helm gh jq yq kustomize kubeconform go python3 rsync; do
           command -v $t >/dev/null || { echo "missing: $t"; missing=1; }
         done
-        python3 -c "import yaml" 2>/dev/null || { echo "missing: python3 PyYAML (pip install pyyaml)"; missing=1; }
         yq --version 2>/dev/null | grep -q mikefarah || { echo "wrong yq: need mikefarah/yq v4"; missing=1; }
         [ $missing -eq 0 ] && echo "all tools found"
         exit $missing

@@ -12,13 +12,14 @@ type=$(yq '.source.type' mirror/chart.yaml)
 version=$(yq '.version' mirror/chart.yaml)
 registry=${MIRROR_REGISTRY:-ghcr.io}   # override only for local testing
 dest="oci://$registry/$owner/charts"
-# Local test registries speak plain HTTP.
+# Local test registries speak plain HTTP. (The ${a[@]+...} form keeps empty
+# arrays safe under set -u on macOS bash 3.2.)
 plain=(); [ "${MIRROR_PLAIN_HTTP:-}" = "1" ] && plain=(--plain-http)
 
 digest_of() {
   # `helm show chart` does not print the digest; `helm pull` does.
   local tmp; tmp=$(mktemp -d)
-  helm pull "${plain[@]}" "$dest/$name" --version "$version" -d "$tmp" 2>&1 | sed -n 's/^Digest: //p'
+  helm pull ${plain[@]+"${plain[@]}"} "$dest/$name" --version "$version" -d "$tmp" 2>&1 | sed -n 's/^Digest: //p'
   rm -rf "$tmp"
 }
 
@@ -41,7 +42,10 @@ case "$type" in
 esac
 
 tgz=$(ls "$work"/*.tgz)
-out=$(helm push "${plain[@]}" "$tgz" "$dest" 2>&1); echo "$out" >&2
+if ! out=$(helm push ${plain[@]+"${plain[@]}"} "$tgz" "$dest" 2>&1); then
+  echo "helm push to $dest failed:" >&2; echo "$out" >&2; exit 1
+fi
+echo "$out" >&2
 digest=$(sed -n 's/^Digest: //p' <<<"$out")
 [ -n "$digest" ] || { echo "could not read digest from helm push" >&2; exit 1; }
 echo "version=$version"; echo "digest=$digest"
