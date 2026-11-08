@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Build strict JSON schemas for the CRDs our manifests use (Flux, Kyverno,
-# Prometheus Operator) into <out-dir>. Cached: delete the dir to refresh.
+# Prometheus Operator, PromotionGate) into <out-dir>. Cached; rebuilt whenever
+# this script or the PromotionGate CRD changes.
 set -euo pipefail
 out=${1:?}; here=$(cd "$(dirname "$0")/.." && pwd)
-[ -f "$out/.done" ] && exit 0
+stamp=$(cat "$here/scripts/schemas.sh" "$here/scripts/crd2schema.py" "$here/promoter/crd.yaml" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -d' ' -f1)
+[ "$(cat "$out/.done" 2>/dev/null)" = "$stamp" ] && exit 0
+rm -rf "$out"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 flux install --export > "$tmp/flux.yaml"
 helm template k kyverno --repo https://kyverno.github.io/kyverno --version 3.9.2 \
@@ -12,4 +15,4 @@ helm pull kube-prometheus-stack --repo https://prometheus-community.github.io/he
 cat "$tmp"/kube-prometheus-stack/charts/crds/crds/*.yaml > "$tmp/prom.yaml"
 python3 "$here/scripts/crd2schema.py" "$out" "$tmp/flux.yaml" "$tmp/kyverno.yaml" "$tmp/prom.yaml" \
   "$here/promoter/crd.yaml"
-touch "$out/.done"
+echo "$stamp" > "$out/.done"
