@@ -3,7 +3,7 @@
 # chart to GHCR and opens the entry PR for the first tier in tiers.yaml.
 name: kube-prometheus-stack
 source:
-  type: http            # http | oci | local
+  type: http # http | oci | local
   repo: https://prometheus-community.github.io/helm-charts
   chart: kube-prometheus-stack
-version: 93.0.0
+version: 92.21.2

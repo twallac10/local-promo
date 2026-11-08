@@ -6,7 +6,7 @@ metadata:
   name: kube-prometheus-stack
   namespace: monitoring
   annotations:
-    platform.twallac10.io/chart-version: "93.0.0"
+    platform.twallac10.io/chart-version: "92.21.2"
 spec:
   ref:
     digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
@@ -44,10 +44,10 @@ spec:
         general: false
     prometheusOperator:
       image:
-        tag: v0.95.1
+        tag: v0.94.2
       prometheusConfigReloader:
         image:
-          tag: v0.95.1
+          tag: v0.94.2
       admissionWebhooks:
         patch:
           image:

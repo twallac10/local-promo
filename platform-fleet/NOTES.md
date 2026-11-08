@@ -220,7 +220,7 @@ Run after `task up` (and `task gh:envs`); `task demo:reset` between scenarios
 restores every repo to the workspace baseline and closes open promotion PRs.
 
 - `task demo:good`: PR bumping kube-prometheus-stack's `mirror/chart.yaml`
-  to 93.1.0 (same operator version as 93.0.0; values validated against it) →
+  to 92.22.0 (same operator version as 92.21.2; values validated against it) →
   mirror workflow → dev entry PR (auto-merge) → dev gate → stg PR
   (auto-merge) → stg gate → prd PR waiting for environment approval. The
   script follows each step and stops at the approval.
@@ -243,6 +243,17 @@ restores every repo to the workspace baseline and closes open promotion PRs.
   record the commit that last changed the tier's release.yaml; the operator
   re-gates when it changes, and `promote`/CI require the source tier's success
   for that exact commit (CI: "gated release commit … not gated yet").
+
+## Architectures (first live run, Apple Silicon)
+
+- prometheus-operator / prometheus-config-reloader **v0.95.1** were published
+  amd64-only, so kube-prometheus-stack 93.x never became Ready on arm64
+  (`no match for platform in manifest`). Baseline is now chart **92.21.2**
+  with operator **v0.94.2** (multi-arch); `demo:good` bumps to 92.22.0
+  (same operator). `task images:check` renders everything and fails on any
+  image without both linux/amd64 and linux/arm64.
+- The promoter image is built for linux/amd64 and linux/arm64 (buildx,
+  cross-compiled Go; no emulation).
 
 ## Trust assumptions
 

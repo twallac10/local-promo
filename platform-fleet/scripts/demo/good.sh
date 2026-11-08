@@ -4,7 +4,7 @@
 set -euo pipefail
 source "$(dirname "$0")/../lib.sh"; source "$(dirname "$0")/lib.sh"
 app=kube-prometheus-stack; repo=$(app_repo "$app")
-version=${DEMO_KPS_VERSION:-93.1.0}
+version=${DEMO_KPS_VERSION:-92.22.0}
 preflight
 first=$(first_tier)
 

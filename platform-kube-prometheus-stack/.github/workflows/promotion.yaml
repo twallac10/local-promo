@@ -20,6 +20,6 @@ concurrency:
 
 jobs:
   promotion:
-    uses: twallac10/platform-promoter/.github/workflows/guardrails.yaml@v0.1.4
+    uses: twallac10/platform-promoter/.github/workflows/guardrails.yaml@v0.1.5
     with:
-      promoter-ref: v0.1.4
+      promoter-ref: v0.1.5

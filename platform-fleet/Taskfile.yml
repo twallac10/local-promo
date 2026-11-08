@@ -58,6 +58,10 @@ tasks:
       - ./scripts/lint-fleet.sh
       - ./scripts/validate-apps.sh
 
+  images:check:
+    desc: "Every rendered image exists for linux/amd64 and linux/arm64 (network; task images:check -- <tier>)"
+    cmds: ["./scripts/check-images.sh {{.CLI_ARGS}}"]
+
   # --- clusters ------------------------------------------------------------
   up:
     desc: Create a kind cluster per tier and bootstrap Flux (needs GITHUB_TOKEN for flux bootstrap)
@@ -97,7 +101,7 @@ tasks:
     cmds: [./scripts/gh-envs.sh]
   # --- demo scenarios (after task up; run task demo:reset between them) ---
   demo:good:
-    desc: "kube-prometheus-stack version bump flows tier by tier to a prd PR awaiting approval (DEMO_KPS_VERSION, default 93.1.0)"
+    desc: "kube-prometheus-stack version bump flows tier by tier to a prd PR awaiting approval (DEMO_KPS_VERSION, default 92.22.0)"
     cmds: [./scripts/demo/good.sh]
   demo:ready-but-broken:
     desc: "A values change drops the canary scrape target: HelmRelease Ready, gate blocks it in the first tier"
