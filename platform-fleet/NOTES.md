@@ -262,6 +262,11 @@ restores every repo to the workspace baseline and closes open promotion PRs.
   traces and logs only; gates read the collector's own :8888 metrics).
   `task lint` now runs the pinned collector image's `validate` on each tier's
   rendered config when docker is available.
+- Steady state still cost ~1.8 cores per cluster, and every leader-elected
+  component (kube-controller-manager, scheduler, Flux, Kyverno) restarted
+  together every few minutes: etcd fsyncs on the shared Docker Desktop disk
+  stalled the API server. etcd now runs on the node's tmpfs (`kind/cluster.yaml`);
+  cluster state is lost on a Docker restart (`task down && task up`).
 - Three clusters bootstrapping at once starved the API servers on 6 CPUs
   (leader-election restarts everywhere). `task up` now builds tiers one at a
   time, and `task up -- dev` builds a single tier.
