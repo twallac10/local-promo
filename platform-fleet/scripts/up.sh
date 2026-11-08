@@ -6,6 +6,9 @@
 #                 contents + administration write, for the deploy key).
 # PROMOTER_TOKEN: the promoter's token (app repos: contents, pull requests,
 #                 deployments write). Stored only as a Secret in each cluster.
+# STAGGER=false:  don't wait for each cluster to be Ready before starting the
+#                 next (faster on a big machine; on a laptop, three clusters
+#                 installing at once starve each other's control planes).
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 : "${GITHUB_TOKEN:?set GITHUB_TOKEN to the Flux bootstrap token for $OWNER/platform-fleet}"
@@ -39,6 +42,18 @@ for tier in $(tiers); do
       --owner "$OWNER" --repository platform-fleet --personal \
       --branch main --path "clusters/$tier" \
       --version "$FLUX_VERSION"
+    if [ "${STAGGER:-true}" = true ]; then
+      echo "== waiting for every Kustomization on $ctx to be Ready (up to 30m; STAGGER=false to skip)"
+      start=$(date +%s)
+      until [ "$(kubectl --context "$ctx" -n flux-system get kustomizations -o json 2>/dev/null \
+                 | jq '[.items[] | select(([.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length) == 0)] | length')" = 0 ]; do
+        if [ $(( $(date +%s) - start )) -gt 1800 ]; then
+          echo "warning: $ctx not fully Ready after 30m; continuing (check task status)"; break
+        fi
+        printf '.'; sleep 20
+      done
+      echo " $ctx ready after $(( ($(date +%s) - start) / 60 ))m"
+    fi
   done
 done
 echo
