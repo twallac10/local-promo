@@ -1,0 +1,13 @@
+# Chart source. OCI-only, from our GHCR mirror (stand-in for ACR).
+# The digest is set per tier by tiers/<tier>/release.yaml; never set ref here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: __APP__
+  namespace: __APP__
+spec:
+  interval: 10m
+  url: oci://ghcr.io/twallac10/charts/__APP__
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy

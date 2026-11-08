@@ -1,0 +1,9 @@
+# Upstream chart to mirror into oci://ghcr.io/twallac10/charts/<name>.
+# Changing `version` on main runs .github/workflows/mirror.yaml, which pushes the
+# chart to GHCR and opens the entry PR for the first tier in tiers.yaml.
+name: kyverno
+source:
+  type: http            # http | oci | local
+  repo: https://kyverno.github.io/kyverno
+  chart: kyverno
+version: 3.9.2

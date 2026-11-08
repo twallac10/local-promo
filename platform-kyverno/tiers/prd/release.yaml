@@ -1,0 +1,36 @@
+# PROMOTABLE. A promotion copies this file unchanged from tier N-1 to tier N.
+# Only the chart digest, image tags and settings shared by every tier go here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: kyverno
+  namespace: kyverno
+  annotations:
+    platform.twallac10.io/chart-version: "3.9.2"
+spec:
+  ref:
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kyverno
+  namespace: kyverno
+spec:
+  values:
+    admissionController:
+      initContainer:
+        image:
+          tag: v1.19.2
+      container:
+        image:
+          tag: v1.19.2
+    backgroundController:
+      image:
+        tag: v1.19.2
+    cleanupController:
+      image:
+        tag: v1.19.2
+    reportsController:
+      image:
+        tag: v1.19.2
