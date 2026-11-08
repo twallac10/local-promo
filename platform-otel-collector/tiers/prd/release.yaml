@@ -34,24 +34,15 @@ spec:
         enabled: false
       metrics:
         enabled: true
-      prom-exporter:
-        enabled: true
-        containerPort: 8889
-        servicePort: 8889
-        protocol: TCP
     serviceMonitor:
       enabled: true
       metricsEndpoints:
         - port: metrics
           interval: 15s
-        - port: prom-exporter
-          interval: 15s
     config:
       exporters:
         debug:
           verbosity: basic
-        prometheus:
-          endpoint: ${env:MY_POD_IP}:8889
       service:
         pipelines:
           logs:
@@ -65,4 +56,4 @@ spec:
           metrics:
             receivers: [otlp]
             processors: [memory_limiter, batch]
-            exporters: [prometheus]
+            exporters: [debug]

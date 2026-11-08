@@ -257,6 +257,11 @@ restores every repo to the workspace baseline and closes open promotion PRs.
 - Grafana 13 is OOM-killed during startup with a 256Mi limit (log just stops
   mid-startup). Now 256Mi request / 1Gi limit; liveness waits 300s for its
   first-start migration. prometheus-operator limit 256Mi.
+- The `otel/opentelemetry-collector-k8s` distribution has no `prometheus`
+  exporter; the collector refused to start. Dropped it (the canary sends
+  traces and logs only; gates read the collector's own :8888 metrics).
+  `task lint` now runs the pinned collector image's `validate` on each tier's
+  rendered config when docker is available.
 - Three clusters bootstrapping at once starved the API servers on 6 CPUs
   (leader-election restarts everywhere). `task up` now builds tiers one at a
   time, and `task up -- dev` builds a single tier.

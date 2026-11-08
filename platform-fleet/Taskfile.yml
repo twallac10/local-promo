@@ -57,6 +57,7 @@ tasks:
       - ./scripts/repos.sh shape
       - ./scripts/lint-fleet.sh
       - ./scripts/validate-apps.sh
+      - ./scripts/validate-otel.sh
 
   images:check:
     desc: "Every rendered image exists for linux/amd64 and linux/arm64 (network; task images:check -- <tier>)"
