@@ -31,6 +31,7 @@ spec:
     cleanupController:
       image:
         tag: v1.19.2
+      enabled: false
     reportsController:
       image:
         tag: v1.19.2
