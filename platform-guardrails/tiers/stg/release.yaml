@@ -1,0 +1,21 @@
+# PROMOTABLE. A promotion copies this file unchanged from tier N-1 to tier N.
+# Only the chart digest, image tags and settings shared by every tier go here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: guardrails
+  namespace: guardrails
+  annotations:
+    platform.twallac10.io/chart-version: "0.1.0"
+spec:
+  ref:
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: guardrails
+  namespace: guardrails
+spec:
+  values:
+    allowedOCIPrefix: "oci://ghcr.io/twallac10/charts/"

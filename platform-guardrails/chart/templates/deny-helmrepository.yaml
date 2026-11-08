@@ -1,0 +1,22 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: deny-helmrepository
+  labels: {{ include "guardrails.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Deny HelmRepository
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/description: >-
+      Platform charts are consumed only as OCI artifacts (OCIRepository). HTTP/OCI
+      HelmRepository sources are not allowed in any namespace.
+spec:
+  validationActions: {{ toYaml .Values.validationActions | nindent 4 }}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["source.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [helmrepositories]
+  validations:
+    - expression: "false"
+      message: "HelmRepository is not allowed. Publish the chart to OCI and use an OCIRepository under {{ .Values.allowedOCIPrefix }}."

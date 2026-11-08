@@ -1,0 +1,7 @@
+# Never commit credentials: tokens live only in cluster Secrets and Actions secrets.
+*.kubeconfig
+kubeconfig*
+.env
+.env.*
+*.tgz
+.cache/

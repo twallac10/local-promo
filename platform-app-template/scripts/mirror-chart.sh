@@ -4,8 +4,8 @@
 # would mint a new digest), and the existing digest is returned.
 # Needs: helm (logged in to ghcr.io), yq. Prints `version=` and `digest=` lines.
 set -euo pipefail
-owner=${1:?usage: mirror-chart.sh <owner>}
-cd "$(dirname "$0")/.."
+owner=${1:?usage: mirror-chart.sh <owner> [dir-with-mirror/chart.yaml]}
+cd "${2:-$(dirname "$0")/..}"
 
 name=$(yq '.name' mirror/chart.yaml)
 type=$(yq '.source.type' mirror/chart.yaml)

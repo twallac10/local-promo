@@ -1,0 +1,94 @@
+# platform-fleet tasks. `task --list` for the overview.
+# Tier and app lists always come from tiers.yaml / apps.yaml.
+version: "3"
+
+vars:
+  # Folder with every repo checked out side by side (default: parent of this repo).
+  WORKSPACE: '{{.WORKSPACE | default (printf "%s/.." .ROOT_DIR)}}'
+
+env:
+  WORKSPACE: "{{.WORKSPACE}}"
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  tools:
+    desc: Check required CLIs are installed
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for t in docker kind kubectl flux helm gh yq kustomize kubeconform go python3 rsync; do
+          command -v $t >/dev/null || { echo "missing: $t"; missing=1; }
+        done
+        exit $missing
+
+  # --- repos ---------------------------------------------------------------
+  repos:create:
+    desc: Create the template, app, fleet and promoter repos on GitHub (app repos from the template) and push the workspace
+    cmds: [./scripts/repos.sh create]
+
+  repos:push:
+    desc: Push every workspace folder to main of its GitHub repo
+    cmds: [./scripts/repos.sh push]
+
+  repos:shape:
+    desc: Check every app repo still matches the template's shape
+    cmds: [./scripts/repos.sh shape]
+
+  charts:seed:
+    desc: "Bootstrap only: mirror all charts to GHCR and point every tier at them"
+    cmds: [./scripts/seed-charts.sh]
+
+  # --- config --------------------------------------------------------------
+  fleet:render:
+    desc: Regenerate clusters/<tier>/ and fleet/ from tiers.yaml and apps.yaml
+    cmds: [./scripts/render.sh]
+
+  lint:
+    desc: Static checks for the fleet and every app repo (no cluster needed)
+    cmds:
+      - ./scripts/render.sh
+      - git diff --exit-code -- clusters fleet || (echo "fleet/ or clusters/ is stale; commit the output of task fleet:render" && exit 1)
+      - ./scripts/repos.sh shape
+      - ./scripts/lint-fleet.sh
+      - ./scripts/validate-apps.sh
+
+  # --- clusters ------------------------------------------------------------
+  up:
+    desc: Create a kind cluster per tier and bootstrap Flux (needs GITHUB_TOKEN for flux bootstrap)
+    cmds: [./scripts/up.sh]
+
+  down:
+    desc: Delete every tier's kind cluster
+    cmds: [./scripts/down.sh]
+
+  status:
+    desc: Flux status per tier (deployment ledger arrives in Phase 2)
+    cmds: [./scripts/status.sh]
+
+  grafana:
+    desc: "Open a tier's Grafana: task grafana -- dev"
+    cmds: ["./scripts/grafana.sh {{.CLI_ARGS}}"]
+
+  # --- promotion (later phases) ---------------------------------------------
+  check:
+    desc: "Phase 2: run the evidence gate for an app in a tier"
+    cmds: ['echo "not built yet (Phase 2: promoter CLI)"; exit 1']
+  promote:
+    desc: "Phase 2: gate + open the next tier's promotion PR"
+    cmds: ['echo "not built yet (Phase 2: promoter CLI)"; exit 1']
+  gh:envs:
+    desc: "Phase 3: one GitHub Environment per tier in every app repo"
+    cmds: ['echo "not built yet (Phase 3)"; exit 1']
+  demo:good:
+    desc: "Phase 5"
+    cmds: ['echo "not built yet (Phase 5)"; exit 1']
+  demo:ready-but-broken:
+    desc: "Phase 5"
+    cmds: ['echo "not built yet (Phase 5)"; exit 1']
+  demo:sneaky:
+    desc: "Phase 5"
+    cmds: ['echo "not built yet (Phase 5)"; exit 1']

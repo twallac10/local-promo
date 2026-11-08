@@ -1,0 +1,6 @@
+apiVersion: v2
+name: guardrails
+description: Kyverno CEL ValidatingPolicies that keep Flux sources OCI-only and inside our registry prefix.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

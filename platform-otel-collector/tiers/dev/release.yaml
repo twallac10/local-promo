@@ -1,0 +1,68 @@
+# PROMOTABLE. A promotion copies this file unchanged from tier N-1 to tier N.
+# Only the chart digest, image tags and settings shared by every tier go here.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: otel-collector
+  namespace: otel
+  annotations:
+    platform.twallac10.io/chart-version: "0.178.2"
+spec:
+  ref:
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000" # set by `task charts:seed` / mirror.yaml
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: otel-collector
+  namespace: otel
+spec:
+  values:
+    fullnameOverride: otel-collector
+    mode: deployment
+    image:
+      repository: otel/opentelemetry-collector-k8s
+      tag: 0.163.2
+    ports:
+      jaeger-compact:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      zipkin:
+        enabled: false
+      metrics:
+        enabled: true
+      prom-exporter:
+        enabled: true
+        containerPort: 8889
+        servicePort: 8889
+        protocol: TCP
+    serviceMonitor:
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: 15s
+        - port: prom-exporter
+          interval: 15s
+    config:
+      exporters:
+        debug:
+          verbosity: basic
+        prometheus:
+          endpoint: ${env:MY_POD_IP}:8889
+      service:
+        pipelines:
+          logs:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [debug]
+          traces:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [debug]
+          metrics:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [prometheus]

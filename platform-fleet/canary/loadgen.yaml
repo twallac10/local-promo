@@ -1,0 +1,53 @@
+# Tiny traffic generator so request metrics and traces keep flowing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: canary
+  labels:
+    app.kubernetes.io/name: loadgen
+    app.kubernetes.io/part-of: platform-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loadgen
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loadgen
+        app.kubernetes.io/part-of: platform-canary
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.11.1
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                curl -sS -o /dev/null --max-time 2 http://podinfo.canary.svc.cluster.local:9898/ || true
+                curl -sS -o /dev/null --max-time 2 http://podinfo.canary.svc.cluster.local:9898/api/info || true
+                sleep 2
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi

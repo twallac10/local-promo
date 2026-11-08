@@ -34,3 +34,9 @@ spec:
     reportsController:
       image:
         tag: v1.19.2
+    test:
+      image:
+        tag: v1.19.2
+    webhooksCleanup:
+      image:
+        tag: v1.19.2

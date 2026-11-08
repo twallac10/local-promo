@@ -1,6 +1,7 @@
 # The promotion chain, in order. Adding a tier is config only:
 #   1. add it here
-#   2. `task fleet:render` (creates clusters/<tier>/ and tiers/<tier>/ stubs)
+#   2. `task fleet:render` (creates clusters/<tier>/platform.yaml)
+#   3. add tiers/<tier>/ to each app repo (release.yaml copied from the previous tier)
 # A tier is a list of clusters (kube contexts); the evidence gate must pass on
 # every cluster in a tier before the next tier's PR is opened.
 tiers:

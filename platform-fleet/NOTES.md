@@ -1,0 +1,116 @@
+# Notes
+
+Running notes for the evidence-gated promotion demo. Status: Phases 0–1 written
+and statically validated; not yet run on live clusters.
+
+## Decisions
+
+| Decision | Choice |
+|---|---|
+| Owner / prefix | `twallac10`, `platform-` |
+| Tiers | `dev` → `stg` → `prd`; only `prd` requires approval |
+| kyverno-policies | Its own app repo |
+| Guardrails | **Promoted app** (`platform-guardrails`): a chart built from source in that repo, mirrored to GHCR and promoted by digest like the others, so new or changed guard policies are proven in dev before prd |
+| Signing (Phase 6) | Wanted, nice to have; after Phase 5 |
+| Gate thresholds | ≥ 3 successful canary scrapes since Ready; counters compared over ≥ 30 s; each check waits ≤ 5 min for data |
+
+## Layout
+
+The repos are developed as one workspace (folders named after the repos) and
+pushed to separate GitHub repos by `task repos:create` / `task repos:push`.
+App repos are created from `platform-app-template`; `task repos:shape` (part of
+`task lint`) fails if an app repo's file set or shared files drift from it.
+
+## Release vs tier config
+
+- `tiers/<tier>/release.yaml` is the only promotable thing: the
+  `OCIRepository` digest (with the semver as an annotation) and the HelmRelease
+  values every tier shares, including explicit image tags.
+- `tiers/<tier>/tier.yaml` is a `HelmRelease` patch with `spec.values` only.
+- `validate.sh` enforces this: `release.yaml` may hold only those two docs and
+  the OCIRepository part only `ref.digest`; `tier.yaml` may only set values, so
+  it can never move a chart digest or a source URL.
+- Values are merged by Kustomize strategic merge on the HelmRelease, so maps
+  deep-merge; lists are replaced. Don't put the same list in both files.
+
+## OCI only
+
+- Charts come only from `oci://ghcr.io/twallac10/charts/<name>` via
+  `OCIRepository` (layerSelector `application/vnd.cncf.helm.chart.content.v1.tar+gzip`)
+  and `HelmRelease.spec.chartRef`. Flux v2.10.0 (OCIRepository `v1`, HelmRelease `v2`).
+- `platform-guardrails` denies any `HelmRepository` and any `OCIRepository`
+  outside the prefix (Kyverno CEL `ValidatingPolicy`, `policies.kyverno.io/v1`,
+  `Deny`). Verified with the Kyverno v1.19.2 CLI: HelmRepository, a docker.io
+  OCIRepository and a lookalike `ghcr.io/twallac10-evil/...` are denied; ours passes.
+- Guardrails are installed after kyverno and before anything else that pulls a
+  chart, so they cover every other app. They cannot cover kyverno itself (it
+  installs them); `validate.sh` and the CI guardrail (Phase 3) cover that gap.
+- `mirror-chart.sh` never re-pushes an existing version, because a re-push
+  mints a new digest. A new upstream version means a new `mirror/chart.yaml`.
+- **GHCR visibility:** packages pushed from a laptop start private and GitHub
+  has no API to change that. After the first `task charts:seed`, open
+  `https://github.com/users/twallac10/packages`, and for each `charts/<name>`
+  set Package settings → Change visibility → Public. Packages first pushed by
+  a repo's Actions workflow may inherit that repo's visibility; check once.
+
+## Bootstrap exceptions
+
+- `task charts:seed` points **every** tier at the first digest so `task up` can
+  reach Ready. That is the only time a digest enters a tier other than the
+  first without a promotion PR.
+- The mirror workflow opens the entry PR with `PROMOTER_TOKEN`, because PRs
+  opened with `GITHUB_TOKEN` don't trigger other workflows (the guardrails).
+
+## Kyverno policy mode
+
+- `kyverno-policies` 3.9.2 defaults to CEL `ValidatingPolicy`
+  (`policies.kyverno.io/v1beta1`). `validationFailureAction` (tier.yaml)
+  renders to `validationActions: [Audit]` in dev/stg and `[Deny]` in prd.
+- `vpolExclude.excludeNamespaces: [kube-system, local-path-storage]` (the
+  `policyExclude` value only applies to legacy ClusterPolicy mode).
+- Checked with the Kyverno CLI against the prd policies: the canary (podinfo +
+  loadgen) and every kyverno, kube-prometheus-stack and otel-collector
+  workload pass; a privileged pod is denied. The Prometheus StatefulSet comes
+  from the operator, not the chart, so it was not in that check.
+- Gate note for Phase 2: the handoff says "all ClusterPolicies Ready"; with CEL
+  policies the check is "all ValidatingPolicies Ready".
+
+## Memory
+
+Estimate per cluster, from requests (to be replaced with measured numbers from
+`docker stats` after the first `task up`):
+
+| Component | ~MiB |
+|---|---|
+| kind node (control plane, etcd, kubelet, CNI) | 700 |
+| Flux (4 controllers) | 250 |
+| kyverno (4 controllers, 1 replica each) | 400 |
+| kube-prometheus-stack (prometheus, grafana, operator, ksm) | 650 |
+| otel-collector | 64–256 |
+| canary | 50 |
+| **total** | **~2.2–2.5 GiB** |
+
+Three clusters ≈ 7–8 GiB. Give Docker **12 GiB**. kind with 3 clusters also
+needs higher inotify limits on Linux:
+`sudo sysctl fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512`.
+
+**Measured:** _TBD after first `task up`._
+
+## Trust assumptions
+
+- The promoter's token (fine-grained, app repos only: contents, pull requests,
+  deployments write) is the only identity that writes Deployment statuses. CI
+  trusts a `success` Deployment as evidence; anyone else with deployments write
+  on an app repo could forge it. (Phase 2–3.)
+- The promoter is deployed by platform-fleet and is **not** itself gated
+  (chicken-and-egg: the thing that produces evidence can't be promoted by its
+  own evidence). Changes to it are reviewed normally. (Phase 4.)
+
+## What would differ in a real ~20-cluster AKS setup
+
+- ACR instead of GHCR; private, pulled with workload identity, not public packages.
+- Each tier is several clusters; the gate must pass on all before tier N+1's PR
+  (the promoter in each cluster attests; something must aggregate per tier).
+- Flux bootstrap via the AKS Flux extension or Terraform, not `flux bootstrap github`.
+- GitHub App instead of PATs for the promoter and Flux.
+- Real alerting (Alertmanager HA), node-exporter, longer retention.
