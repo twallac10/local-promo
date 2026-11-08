@@ -65,6 +65,13 @@ for repo in "$@"; do
       rel=$(yq 'select(.kind=="HelmRelease") | .spec.releaseName // .metadata.name' "$out")
       if r=$(helm template "$rel" "$chart" -n "$ns" -f "$vals" --include-crds 2>&1); then
         echo "$r" | kc -ignore-missing-schemas - >/dev/null || { echo "$r" | kc -ignore-missing-schemas - >&2 || true; err "$name/$tier: rendered chart"; }
+        # Label values: the API server rejects these, kubeconform doesn't check.
+        while IFS= read -r lv; do
+          [ -z "$lv" ] && continue
+          if [ ${#lv} -gt 63 ] || ! [[ "$lv" =~ ^([A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?)?$ ]]; then
+            err "$name/$tier: invalid label value in rendered chart: $lv"
+          fi
+        done < <(echo "$r" | yq -N '.metadata.labels // {} | .[]' 2>/dev/null | sort -u)
       else
         echo "$r" | tail -5 >&2; err "$name/$tier: helm template"
       fi

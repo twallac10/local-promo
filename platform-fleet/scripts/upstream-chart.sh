@@ -5,7 +5,14 @@ set -euo pipefail
 repo=${1:?}; cache=${2:?}
 m="$repo/mirror/chart.yaml"
 type=$(yq '.source.type' "$m"); version=$(yq '.version' "$m"); name=$(yq '.name' "$m")
-if [ "$type" = local ]; then echo "$repo/$(yq '.source.path' "$m")"; exit 0; fi
+if [ "$type" = local ]; then
+  # Render a package whose version carries build metadata, the way Flux sees
+  # an OCI chart (0.1.1+<digest>), so labels built from .Chart.Version are
+  # checked for '+' (invalid in label values).
+  out="$cache/local-$name"; rm -rf "$out"; mkdir -p "$out"
+  helm package "$repo/$(yq '.source.path' "$m")" --version "$version+lintbuild" -d "$out" >/dev/null
+  echo "$out/$(ls "$out" | head -1)"; exit 0
+fi
 dest="$cache/$name-$version"
 if [ ! -d "$dest" ]; then
   # Pull into a temp dir and move it in place, so a failed download never
