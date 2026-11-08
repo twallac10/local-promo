@@ -226,8 +226,10 @@ func (r *Reconciler) decide(ctx context.Context, pg *v1.PromotionGate) (*decisio
 	}
 	short := d.rel.ShortDigest()
 	switch {
-	case dep == nil || dep.Payload.Digest != d.rel.Digest:
-		d.run, d.why = true, "new release "+d.rel.Version+" ("+short+")"
+	case dep == nil || dep.Payload.Digest != d.rel.Digest || dep.Payload.ReleaseCommit != commit:
+		// A release is the whole release.yaml (digest + shared values), so a
+		// values-only change (same digest, new commit) is gated too.
+		d.run, d.why = true, "new release "+d.rel.Version+" ("+short+" @ "+shortSHA(commit)+")"
 	case dep.State == "in_progress" || dep.State == "queued" || dep.State == "pending":
 		d.run, d.why = since > RetryStale, "stale "+dep.State+" gate"
 		d.phase, d.after = v1.PhaseChecking, RetryStale-since
@@ -479,6 +481,13 @@ func FleetLoader(src string, ttl time.Duration) func(context.Context) (*config.F
 		cached, at = f, time.Now()
 		return f, nil
 	}
+}
+
+func shortSHA(s string) string {
+	if len(s) > 7 {
+		return s[:7]
+	}
+	return s
 }
 
 func errOr(err error, msg string) error {

@@ -33,6 +33,14 @@ func (g GitFiles) Main(path string) ([]byte, bool, error) {
 	return b, true, nil
 }
 
+func (g GitFiles) MainCommit(path string) (string, error) {
+	b, err := exec.Command("git", "-C", g.Dir, "log", "-1", "--format=%H", g.MainRef, "--", path).Output()
+	if err != nil {
+		return "", fmt.Errorf("git log %s: %w", path, err)
+	}
+	return strings.TrimSpace(string(b)), nil
+}
+
 // ChangedFiles lists files changed between the merge base of main and HEAD.
 func ChangedFiles(dir, mainRef string) ([]string, error) {
 	out, err := exec.Command("git", "-C", dir, "diff", "--name-only", mainRef+"...HEAD").Output()

@@ -183,7 +183,7 @@ func TestFailedGateRetryThrottle(t *testing.T) {
 	if pg.Status.Phase != v1.PhaseFailed || s.g.promotes != 1 {
 		t.Fatalf("%+v", pg.Status)
 	}
-	s.led.dep = &ledger.Deployment{State: "failure", Payload: ledger.Payload{Digest: dB}}
+	s.led.dep = &ledger.Deployment{State: "failure", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "c0ffee"}}
 	// Same Flux state, a minute later: no retry.
 	now = now.Add(time.Minute)
 	pg, res := s.reconcile(t)
@@ -206,9 +206,19 @@ func TestFailedGateRetryThrottle(t *testing.T) {
 	}
 }
 
+func TestValuesOnlyChangeIsGated(t *testing.T) {
+	s := newSetup(t, "dev", "True", now.Add(-time.Hour))
+	// Same digest, but gated at an older release commit: re-gate.
+	s.led.dep = &ledger.Deployment{State: "success", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "0ld0ld"}}
+	s.reconcile(t)
+	if s.g.promotes != 1 {
+		t.Fatal("values-only change was not gated")
+	}
+}
+
 func TestAlreadyPromoted(t *testing.T) {
 	s := newSetup(t, "dev", "True", now.Add(-time.Hour))
-	s.led.dep = &ledger.Deployment{State: "success", Payload: ledger.Payload{Digest: dB}}
+	s.led.dep = &ledger.Deployment{State: "success", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "c0ffee"}}
 	s.led.files["tiers/stg/release.yaml"] = rel(dB)
 	pg, _ := s.reconcile(t)
 	if s.g.promotes != 0 || pg.Status.Phase != v1.PhasePromoted {

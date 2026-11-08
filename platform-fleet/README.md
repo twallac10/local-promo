@@ -44,13 +44,25 @@ task charts:seed      # mirror charts to GHCR, pin every tier to the digests
 #   -> make the GHCR packages public (one time, see NOTES.md)
 task repos:push       # commit the digests, tag platform-promoter (VERSION)
 PROMOTER_TOKEN=... task gh:envs   # environments, branch protection, auto-merge, secret
-task up               # kind clusters + Flux bootstrap per tier
+GITHUB_TOKEN=... PROMOTER_TOKEN=... task up   # kind clusters, Flux bootstrap, promoter Secret per cluster
 task status
 task grafana -- dev
 task check -- --app kyverno --tier dev        # evidence table + dev Deployment
 task promote -- --app kyverno --from dev      # gate dev, open the stg PR (auto-merges)
 task down
 ```
+
+## Demo scenarios
+
+```sh
+task demo:good               # chart bump flows dev -> stg -> prd PR awaiting approval
+task demo:reset
+task demo:ready-but-broken   # HelmRelease Ready, gate blocks it in dev: canary not scraped
+task demo:reset
+task demo:sneaky             # promotion PR that also changes tier.yaml: CI rejects it
+```
+
+Each runs on top of `task up` (see NOTES.md for what each shows).
 
 ## Adding a tier or an app
 

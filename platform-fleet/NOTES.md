@@ -1,7 +1,7 @@
 # Notes
 
-Running notes for the evidence-gated promotion demo. Status: Phases 0–4 written;
-0–1 statically validated, 2–4 unit-tested against fakes; nothing run on live
+Running notes for the evidence-gated promotion demo. Status: Phases 0–5 written;
+0–1 statically validated, 2–4 unit-tested against fakes, 5 scripted; nothing run on live
 clusters or real GitHub yet.
 
 ## Decisions
@@ -213,6 +213,36 @@ needs higher inotify limits on Linux:
   dependsOn so it is up before the apps it gates.
 - Secret `promoter/promoter-github` (PROMOTER_TOKEN) is created by `task up`,
   never committed. The image package on GHCR must be public, like the charts.
+
+## Demo scenarios (Phase 5)
+
+Run after `task up` (and `task gh:envs`); `task demo:reset` between scenarios
+restores every repo to the workspace baseline and closes open promotion PRs.
+
+- `task demo:good`: PR bumping kube-prometheus-stack's `mirror/chart.yaml`
+  to 93.1.0 (same operator version as 93.0.0; values validated against it) →
+  mirror workflow → dev entry PR (auto-merge) → dev gate → stg PR
+  (auto-merge) → stg gate → prd PR waiting for environment approval. The
+  script follows each step and stops at the approval.
+- `task demo:ready-but-broken`: a shared-value change in dev's release.yaml
+  makes Prometheus select only ServiceMonitors labelled
+  `platform.twallac10.io/scrape=opt-in`. It renders fine, passes CI (valid,
+  same digest), the HelmRelease goes Ready, and the canary target silently
+  disappears. The dev gate waits for canary scrapes, fails at `maxWait` with
+  "canary target not discovered", records a failed Deployment and a
+  `PromotionGateFailed` Event, and no stg PR is opened. Takes about maxWait
+  (5m) after Flux applies it.
+- `task demo:sneaky`: a `promote/stg/*` PR (labelled `promotion`) that copies
+  dev's release.yaml and also sets `validationFailureAction: Enforce` in
+  `tiers/stg/tier.yaml`. `promotion / promotion-gate` fails ("only
+  tiers/<target>/release.yaml changed") and the PR never merges.
+- **Bug found while writing these: a release is the whole release.yaml, not
+  just the digest.** ready-but-broken changes values only, so the digest is
+  the same; keyed on the digest alone, the operator wouldn't re-gate and CI
+  would accept promoting new values on old evidence. Gate Deployments now
+  record the commit that last changed the tier's release.yaml; the operator
+  re-gates when it changes, and `promote`/CI require the source tier's success
+  for that exact commit (CI: "gated release commit … not gated yet").
 
 ## Trust assumptions
 

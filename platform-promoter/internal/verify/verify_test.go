@@ -25,6 +25,7 @@ type files struct{ head, main map[string][]byte }
 
 func (f files) Head(p string) ([]byte, bool, error) { b, ok := f.head[p]; return b, ok, nil }
 func (f files) Main(p string) ([]byte, bool, error) { b, ok := f.main[p]; return b, ok, nil }
+func (f files) MainCommit(string) (string, error)    { return "c0ffee1", nil }
 
 type deps map[string]*ledger.Deployment // env/cluster
 
@@ -55,7 +56,7 @@ func base(t *testing.T) Input {
 			main: map[string][]byte{"tiers/dev/release.yaml": rel(dB), "tiers/stg/release.yaml": rel(dA),
 				"base/ocirepository.yaml": []byte("spec:\n  url: oci://ghcr.io/twallac10/charts/kyverno\n")},
 		},
-		Ledger: deps{"dev/kind-tier-dev": {ID: 9, State: "success", Payload: ledger.Payload{Digest: dB}}},
+		Ledger: deps{"dev/kind-tier-dev": {ID: 9, State: "success", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "c0ffee1"}}},
 		Reg:    reg{dB: true},
 	}
 }
@@ -91,7 +92,7 @@ func TestProdNeedsApproval(t *testing.T) {
 	in.Changed = []string{"tiers/prd/release.yaml"}
 	in.Files.(files).head["tiers/prd/release.yaml"] = rel(dB)
 	in.Files.(files).main["tiers/stg/release.yaml"] = rel(dB)
-	in.Ledger = deps{"stg/kind-tier-stg": {State: "success", Payload: ledger.Payload{Digest: dB}}}
+	in.Ledger = deps{"stg/kind-tier-stg": {State: "success", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "c0ffee1"}}}
 	o := run(t, in)
 	if !o.Passed() || !o.RequiresApproval {
 		t.Fatalf("%+v %s", o, failing(o))
@@ -123,9 +124,17 @@ func TestEvidenceForAnotherDigestFails(t *testing.T) {
 	if o := run(t, in); o.Passed() {
 		t.Fatal("passed with evidence for a different digest")
 	}
-	in.Ledger = deps{"dev/kind-tier-dev": {State: "failure", Payload: ledger.Payload{Digest: dB}}}
+	in.Ledger = deps{"dev/kind-tier-dev": {State: "failure", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "c0ffee1"}}}
 	if o := run(t, in); o.Passed() {
 		t.Fatal("passed with a failed source gate")
+	}
+}
+
+func TestValuesChangedSinceSourceGateFails(t *testing.T) {
+	in := base(t)
+	in.Ledger = deps{"dev/kind-tier-dev": {State: "success", Payload: ledger.Payload{Digest: dB, ReleaseCommit: "0ld0ld0"}}}
+	if o := run(t, in); o.Passed() || !strings.Contains(failing(o), "not gated yet") {
+		t.Fatal("passed on evidence for an older release commit with the same digest:", failing(o))
 	}
 }
 

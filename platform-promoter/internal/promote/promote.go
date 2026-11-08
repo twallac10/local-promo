@@ -207,7 +207,7 @@ func (p *Promoter) Promote(ctx context.Context, appName, fromTier string) (strin
 		if err != nil {
 			return "", res, err
 		}
-		if d == nil || d.State != "success" || d.Payload.Digest != res.Release.Digest {
+		if d == nil || d.State != "success" || d.Payload.Digest != res.Release.Digest || d.Payload.ReleaseCommit != res.ReleaseCommit {
 			p.printf("waiting on %s: no successful gate for %s yet; no PR\n", kctx, res.Release.ShortDigest())
 			return "", res, nil
 		}

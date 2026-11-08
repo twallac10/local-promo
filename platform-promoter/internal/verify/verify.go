@@ -38,6 +38,8 @@ const PromotionLabel = "promotion"
 type Files interface {
 	Head(path string) ([]byte, bool, error)
 	Main(path string) ([]byte, bool, error)
+	// MainCommit is the newest commit on main that touched path.
+	MainCommit(path string) (string, error)
 }
 
 // Deployments is the slice of the ledger CI needs.
@@ -199,7 +201,12 @@ func Verify(ctx context.Context, in Input) (*Outcome, error) {
 	o.add(ok && bytes.Equal(src, head), "target = source release.yaml on main",
 		map[bool]string{true: "identical to main:" + srcPath, false: "differs from main:" + srcPath}[ok && bytes.Equal(src, head)])
 
-	// 3. The source tier proved this digest on every cluster.
+	// 3. The source tier proved exactly this release (digest + values, i.e.
+	// the commit that last changed its release.yaml) on every cluster.
+	srcCommit, err := in.Files.MainCommit(srcPath)
+	if err != nil {
+		return nil, err
+	}
 	for _, c := range prev.Clusters {
 		d, err := in.Ledger.LatestDeployment(ctx, in.Repo, prev.Name, appName, c, false)
 		check := fmt.Sprintf("%s gate passed on %s", prev.Name, c)
@@ -210,6 +217,8 @@ func Verify(ctx context.Context, in Input) (*Outcome, error) {
 			o.add(false, check, "no gate Deployment recorded in "+prev.Name)
 		case d.Payload.Digest != rel.Digest:
 			o.add(false, check, fmt.Sprintf("latest Deployment is for %s, not %s", d.Payload.Digest, rel.Digest))
+		case d.Payload.ReleaseCommit != srcCommit:
+			o.add(false, check, fmt.Sprintf("latest Deployment gated release commit %.7s, but %s was last changed in %.7s (not gated yet)", d.Payload.ReleaseCommit, srcPath, srcCommit))
 		case d.State != "success":
 			o.add(false, check, fmt.Sprintf("latest Deployment is %s (%s)", d.State, d.LogURL))
 		default:

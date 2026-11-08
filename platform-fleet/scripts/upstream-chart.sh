@@ -8,11 +8,14 @@ type=$(yq '.source.type' "$m"); version=$(yq '.version' "$m"); name=$(yq '.name'
 if [ "$type" = local ]; then echo "$repo/$(yq '.source.path' "$m")"; exit 0; fi
 dest="$cache/$name-$version"
 if [ ! -d "$dest" ]; then
-  mkdir -p "$dest"
+  # Pull into a temp dir and move it in place, so a failed download never
+  # leaves an empty cache entry behind.
+  mkdir -p "$cache"; tmp=$(mktemp -d "$cache/.pull.XXXXXX")
   if [ "$type" = http ]; then
-    helm pull "$(yq '.source.chart' "$m")" --repo "$(yq '.source.repo' "$m")" --version "$version" --untar -d "$dest" >&2
+    helm pull "$(yq '.source.chart' "$m")" --repo "$(yq '.source.repo' "$m")" --version "$version" --untar -d "$tmp" >&2 || { rm -rf "$tmp"; exit 1; }
   else
-    helm pull "$(yq '.source.repo' "$m")/$(yq '.source.chart' "$m")" --version "$version" --untar -d "$dest" >&2
+    helm pull "$(yq '.source.repo' "$m")/$(yq '.source.chart' "$m")" --version "$version" --untar -d "$tmp" >&2 || { rm -rf "$tmp"; exit 1; }
   fi
+  mv "$tmp" "$dest"
 fi
 echo "$dest/$(ls "$dest" | head -1)"
