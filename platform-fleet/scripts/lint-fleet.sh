@@ -14,3 +14,18 @@ echo "== canary"
 kustomize build "$FLEET_DIR/canary" | kc
 url=$(yq 'select(.kind=="OCIRepository") | .spec.url' "$FLEET_DIR/canary/ocirepository.yaml")
 [[ "$url" == "oci://ghcr.io/$OWNER/charts/"* ]] || die "canary OCIRepository outside GHCR prefix: $url"
+echo "== promoter"
+for tier in $(tiers); do
+  ctx=$(tier_contexts "$tier" | head -1)
+  kustomize build "$FLEET_DIR/promoter" | sed "s|\${TIER}|$tier|g; s|\${CLUSTER_NAME}|$ctx|g" | kc
+done
+kustomize build "$FLEET_DIR/promoter-monitoring" | kc
+# The promoter image must be the released VERSION.
+v=$(cat "$WORKSPACE/platform-promoter/VERSION")
+grep -q "image: ghcr.io/$OWNER/platform-promoter:$v\$" "$FLEET_DIR/promoter/deployment.yaml" \
+  || die "promoter/deployment.yaml must use ghcr.io/$OWNER/platform-promoter:$v (platform-promoter/VERSION)"
+# Every app's events must reach the promoter.
+for app in $(app_names); do
+  yq -e ".spec.eventSources[] | select(.kind == \"Kustomization\" and .name == \"$app\")" "$FLEET_DIR/promoter/alert.yaml" >/dev/null \
+    || die "promoter/alert.yaml lacks $app (run task fleet:render)"
+done

@@ -1,7 +1,7 @@
 # Notes
 
-Running notes for the evidence-gated promotion demo. Status: Phases 0–3 written;
-0–1 statically validated, 2–3 unit-tested against fakes; nothing run on live
+Running notes for the evidence-gated promotion demo. Status: Phases 0–4 written;
+0–1 statically validated, 2–4 unit-tested against fakes; nothing run on live
 clusters or real GitHub yet.
 
 ## Decisions
@@ -167,6 +167,42 @@ needs higher inotify limits on Linux:
 - Approval and tier.yaml: only promotions need approval. A plain PR changing
   `tiers/prd/tier.yaml` merges with just the OCI/secret checks; in a real
   setup add CODEOWNERS review for tier.yaml.
+
+## In-cluster promoter (Phase 4)
+
+- `promoter serve` runs in every tier cluster (`platform-fleet/promoter/`),
+  checks only its own cluster (in-cluster config; it refuses any other cluster
+  name), and talks only to GitHub. Its identity comes from the
+  `flux-system/cluster-identity` ConfigMap (`CLUSTER_NAME`) that `task up`
+  creates per cluster, because several clusters of one tier share
+  `clusters/<tier>/`.
+- **Triggers.** A Flux `Alert` (generated from apps.yaml) sends each app's
+  Kustomization and HelmRelease events to a `generic-hmac` Provider; the
+  promoter verifies the HMAC and only acts on success reasons. Every
+  `RECHECK_INTERVAL` (10m) it re-evaluates every app, so a missed event only
+  delays things. Deviation: `generic-hmac` instead of `generic`, so nothing
+  else in the cluster can trigger promotions by POSTing to it.
+- **What it decides** (from GitHub, not memory, so restarts are safe): no gate
+  recorded for the digest main says this tier runs → gate; failed → retry
+  (2m after a new success event, else 30m); `in_progress` left by a crash →
+  retry after 15m; passed but next tier still behind → re-attempt the PR
+  every 6h; last tier → record only.
+- **Read-only RBAC, with one twist.** Server-side dry-run needs `create`
+  permission. The promoter has create on pods, HelmRepositories and
+  OCIRepositories only for dry-run, and a ValidatingAdmissionPolicy
+  (`promoter-dry-run-only`, native CEL, no Kyverno dependency) denies any
+  non-dry-run write by its ServiceAccount. Plus `create` on Events, and `get`
+  on the one Secret `monitoring/grafana` (separate Kustomization that waits
+  for kube-prometheus-stack).
+- **Chicken-and-egg.** The promoter is deployed by platform-fleet directly and
+  is **not** gated: it is the thing that produces the evidence, so gating it
+  with its own evidence proves nothing, and a broken promoter would block its
+  own fix. Its image is pinned by tag to `platform-promoter/VERSION`;
+  changes go through normal review of platform-promoter and platform-fleet.
+  It has no dependsOn so it is up before the apps it gates.
+- Secrets `promoter/promoter-github` (PROMOTER_TOKEN) and
+  `promoter/promoter-webhook` (random HMAC key) are created by `task up`,
+  never committed. The image package on GHCR must be public, like the charts.
 
 ## Trust assumptions
 

@@ -41,6 +41,17 @@ main plus one commit that copies the source tier's `release.yaml` to
 `tiers/<to>/release.yaml`, and opens (or updates) a PR labelled `promotion`
 with the evidence tables. A failed gate opens nothing.
 
+## In-cluster: `promoter serve`
+
+Deployed by platform-fleet to every cluster (`promoter/`). Gates only its own
+cluster; reacts to Flux notification events (HMAC-signed `generic-hmac`
+Provider, `POST /hook`) and re-checks every app every `RECHECK_INTERVAL`.
+Env: `TIER`, `CLUSTER_NAME`, `PROMOTER_FLEET`, `PROMOTER_TOKEN`,
+`WEBHOOK_TOKEN`, `LISTEN` (`:8080`), `RECHECK_INTERVAL` (`10m`). For a
+non-last tier it runs `promote` (the PR opens once every cluster of the tier
+has passed); in the last tier it records the gate only. The image is built by
+`.github/workflows/image.yaml` on `v*` tags → `ghcr.io/<owner>/platform-promoter:<tag>`.
+
 ## CI: reusable guardrail workflow
 
 `.github/workflows/guardrails.yaml`, called by each app repo's

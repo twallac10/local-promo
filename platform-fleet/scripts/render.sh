@@ -3,6 +3,8 @@
 #   clusters/<tier>/platform.yaml   root Kustomization for ./fleet with TIER=<tier>
 #   fleet/apps/<app>.yaml           GitRepository + Kustomization (./tiers/${TIER})
 #   fleet/canary.yaml               Kustomization for ./canary
+#   fleet/promoter.yaml             in-cluster promoter (+ Grafana Secret access)
+#   promoter/alert.yaml             Flux Alert: app reconcile events -> promoter
 #   fleet/kustomization.yaml
 # Output is committed; `task lint` fails if it is stale. Adding a tier or an
 # app is: edit the YAML, run `task fleet:render`, commit.
@@ -118,6 +120,75 @@ YAML
 YAML
 } > fleet/canary.yaml
 
+# In-cluster promoter: deployed to every cluster, NOT itself gated (it produces
+# the evidence; see NOTES.md). No dependsOn: it must be up before the apps it gates.
+cat > fleet/promoter.yaml <<YAML
+$hdr
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: promoter
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./promoter
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  postBuild:
+    substitute:
+      TIER: \${TIER}
+    # CLUSTER_NAME: created per cluster by \`task up\` (a tier can have many clusters).
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-identity
+---
+# Lets the promoter read the Grafana admin Secret (one Secret, by name), once
+# kube-prometheus-stack has created the monitoring namespace.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: promoter-monitoring
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: promoter
+    - name: kube-prometheus-stack
+  interval: 10m
+  retryInterval: 1m
+  path: ./promoter-monitoring
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+YAML
+
+# Flux tells the promoter when an app reconciled successfully.
+{
+  cat <<YAML
+$hdr
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: promoter
+  namespace: promoter
+spec:
+  providerRef:
+    name: promoter
+  eventSeverity: info
+  eventSources:
+YAML
+  for i in $(seq 0 $(( $(yq '.apps | length' apps.yaml) - 1 ))); do
+    name=$(yq ".apps[$i].name" apps.yaml); ns=$(yq ".apps[$i].namespace" apps.yaml)
+    printf '    - kind: Kustomization\n      namespace: flux-system\n      name: %s\n' "$name"
+    printf '    - kind: HelmRelease\n      namespace: %s\n      name: %s\n' "$ns" "$name"
+  done
+} > promoter/alert.yaml
+
 {
   echo "$hdr"
   echo "apiVersion: kustomize.config.k8s.io/v1beta1"
@@ -125,4 +196,5 @@ YAML
   echo "resources:"
   for n in "${names[@]}"; do echo "  - apps/$n.yaml"; done
   echo "  - canary.yaml"
+  echo "  - promoter.yaml"
 } > fleet/kustomization.yaml
