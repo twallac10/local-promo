@@ -46,7 +46,8 @@ for tier in $(tiers); do
       echo "== waiting for every Kustomization on $ctx to be Ready (up to 30m; STAGGER=false to skip)"
       start=$(date +%s)
       until [ "$(kubectl --context "$ctx" -n flux-system get kustomizations -o json 2>/dev/null \
-                 | jq '[.items[] | select(([.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length) == 0)] | length')" = 0 ]; do
+                 | jq 'if any(.items[]; .metadata.name == "canary") | not then -1
+                       else [.items[] | select(([.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length) == 0)] | length end')" = 0 ]; do
         if [ $(( $(date +%s) - start )) -gt 1800 ]; then
           echo "warning: $ctx not fully Ready after 30m; continuing (check task status)"; break
         fi
