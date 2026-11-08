@@ -7,7 +7,7 @@ metadata:
   namespace: otel
 spec:
   interval: 10m
-  url: oci://ghcr.io/twallac10/charts/otel-collector
+  url: oci://ghcr.io/twallac10/charts/opentelemetry-collector
   layerSelector:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy

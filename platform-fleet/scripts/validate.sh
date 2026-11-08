@@ -51,6 +51,11 @@ for repo in "$@"; do
     tkeys=$(yq 'select(.kind=="HelmRelease") | .spec | keys | join(",")' "$dir/tier.yaml")
     [ "$tkeys" = "values" ] || err "$name/$tier: tier.yaml may only set spec.values (got $tkeys)"
 
+    # The OCIRepository must point at the name helm push publishes under.
+    mname=$(yq '.name' "$repo/mirror/chart.yaml")
+    url=$(yq 'select(.kind=="OCIRepository") | .spec.url' "$out")
+    [ "$url" = "$prefix$mname" ] || err "$name/$tier: OCIRepository url $url != $prefix$mname (mirror/chart.yaml name)"
+
     # OCI-only
     yq -e 'select(.kind=="HelmRepository")' "$out" >/dev/null 2>&1 && err "$name/$tier: HelmRepository is not allowed"
     while read -r url; do
@@ -61,6 +66,8 @@ for repo in "$@"; do
     if [ "${SKIP_RENDER:-}" != "1" ]; then
       vals=$(mktemp); yq 'select(.kind=="HelmRelease") | .spec.values // {}' "$out" > "$vals"
       chart=$("$here/scripts/upstream-chart.sh" "$repo" "$cache/charts")
+      cname=$(helm show chart "$chart" | yq '.name')
+      [ "$cname" = "$mname" ] || err "$name/$tier: mirror/chart.yaml name '$mname' != chart name '$cname' (helm push publishes under the chart name)"
       ns=$(yq 'select(.kind=="HelmRelease") | .spec.targetNamespace // .metadata.namespace' "$out")
       rel=$(yq 'select(.kind=="HelmRelease") | .spec.releaseName // .metadata.name' "$out")
       if r=$(helm template "$rel" "$chart" -n "$ns" -f "$vals" --include-crds 2>&1); then

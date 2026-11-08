@@ -42,6 +42,10 @@ case "$type" in
 esac
 
 tgz=$(ls "$work"/*.tgz)
+# helm push publishes under the chart's own name, so mirror/chart.yaml's name
+# (and the OCIRepository URL) must match it, or the chart lands elsewhere.
+pkg=$(basename "$tgz" "-$version.tgz")
+[ "$pkg" = "$name" ] || { echo "mirror/chart.yaml name '$name' != chart name '$pkg' (helm push would publish $dest/$pkg)" >&2; exit 1; }
 if ! out=$(helm push ${plain[@]+"${plain[@]}"} "$tgz" "$dest" 2>&1); then
   echo "helm push to $dest failed:" >&2; echo "$out" >&2; exit 1
 fi
