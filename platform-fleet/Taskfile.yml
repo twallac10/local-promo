@@ -66,7 +66,7 @@ tasks:
     cmds: [./scripts/down.sh]
 
   status:
-    desc: Flux status per tier (deployment ledger arrives in Phase 2)
+    desc: Flux status per tier, then the latest gate Deployment per app per tier
     cmds: [./scripts/status.sh]
 
   grafana:
@@ -74,12 +74,22 @@ tasks:
     cmds: ["./scripts/grafana.sh {{.CLI_ARGS}}"]
 
   # --- promotion (later phases) ---------------------------------------------
+  promoter:build:
+    desc: Build the promoter CLI from the platform-promoter checkout
+    dir: "{{.WORKSPACE}}/platform-promoter"
+    sources: ["**/*.go", go.mod, go.sum]
+    generates: [bin/promoter]
+    cmds: [go build -o bin/promoter ./cmd/promoter]
+
   check:
-    desc: "Phase 2: run the evidence gate for an app in a tier"
-    cmds: ['echo "not built yet (Phase 2: promoter CLI)"; exit 1']
+    desc: "Run the evidence gate and record a Deployment: task check -- --app kyverno --tier dev [--no-record]"
+    deps: [promoter:build]
+    cmds: ['"{{.WORKSPACE}}/platform-promoter/bin/promoter" check --fleet "{{.ROOT_DIR}}" {{.CLI_ARGS}}']
+
   promote:
-    desc: "Phase 2: gate + open the next tier's promotion PR"
-    cmds: ['echo "not built yet (Phase 2: promoter CLI)"; exit 1']
+    desc: "Gate the source tier, then open the next tier's PR: task promote -- --app kyverno --from dev"
+    deps: [promoter:build]
+    cmds: ['"{{.WORKSPACE}}/platform-promoter/bin/promoter" promote --fleet "{{.ROOT_DIR}}" {{.CLI_ARGS}}']
   gh:envs:
     desc: "Phase 3: one GitHub Environment per tier in every app repo"
     cmds: ['echo "not built yet (Phase 3)"; exit 1']

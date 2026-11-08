@@ -55,15 +55,15 @@ type Options struct {
 
 // Report is the outcome of a gate run on one cluster.
 type Report struct {
-	App      string            `json:"app"`
-	Tier     string            `json:"tier"`
-	Cluster  string            `json:"cluster"`
-	Digest   string            `json:"digest"`
-	Version  string            `json:"version"`
-	Results  []Result          `json:"results"`
+	App      string             `json:"app"`
+	Tier     string             `json:"tier"`
+	Cluster  string             `json:"cluster"`
+	Digest   string             `json:"digest"`
+	Version  string             `json:"version"`
+	Results  []Result           `json:"results"`
 	Metrics  map[string]float64 `json:"metrics,omitempty"` // recorded for the next run's baseline
-	Started  time.Time         `json:"started"`
-	Finished time.Time         `json:"finished"`
+	Started  time.Time          `json:"started"`
+	Finished time.Time          `json:"finished"`
 }
 
 // Passed is true when no check failed (skips are fine).

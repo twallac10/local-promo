@@ -200,6 +200,8 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (d Duration) MarshalJSON() ([]byte, error) { return []byte(`"` + time.Duration(d).String() + `"`), nil }
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + time.Duration(d).String() + `"`), nil
+}
 
 func (d Duration) D() time.Duration { return time.Duration(d) }

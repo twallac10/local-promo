@@ -1,5 +1,79 @@
 # platform-promoter
 
-Evidence-gated promoter (Go) and the reusable GitHub workflows every app repo
-calls. Built in Phase 2 (CLI), Phase 3 (reusable guardrail workflow) and
-Phase 4 (in-cluster image). Empty for now.
+Evidence-gated promoter for platform apps. A change moves to tier N only once
+it is proven in tier N-1; the promotion PR is generated with that evidence.
+
+```
+promoter check   --app kyverno --tier dev    # gate + record a Deployment in the dev environment
+promoter promote --app kyverno --from dev    # gate dev, then open the stg PR
+promoter checks                              # list check sets
+```
+
+Flags: `--fleet <dir|raw-url>` (tiers.yaml/apps.yaml; env `PROMOTER_FLEET`),
+`--context <ctx>` (check only this cluster of the tier), `--no-record` (dry run:
+no Deployments, comments or Events; reads public repos without a token).
+Token: `PROMOTER_TOKEN` (fine-grained, app repos only: contents, pull
+requests, deployments write). Exit codes: 0 pass, 1 gate failed, 2 error.
+From platform-fleet: `task check -- --app kyverno --tier dev`.
+
+## What `check` does (per cluster in the tier)
+
+1. Reads `tiers/<tier>/release.yaml` from the app repo's `main` at the commit
+   that last changed it: the release the tier *should* run.
+2. Starts a GitHub Deployment (environment = tier, ref = the commit the
+   cluster applied, payload = app, cluster, chart digest, version), status
+   `in_progress`.
+3. Runs the checks concurrently. A check that lacks data returns *pending* and
+   is asked again every `pollInterval`, up to `maxWait`; still pending then =
+   fail. No soak timer.
+4. Posts the evidence table as a commit comment (with the recorded metrics in
+   a hidden JSON marker, the baseline for the next run), sets the Deployment to
+   `success`/`failure` with a one-line summary and a link to the comment, and
+   records a Kubernetes Event (`PromotionGatePassed` / `PromotionGateFailed`)
+   on the app's HelmRelease.
+
+## What `promote` adds
+
+Runs `check` on the source tier. If every cluster in it has a `success`
+Deployment for the same digest, and the source `release.yaml` on main is
+still exactly what was checked, it points `promote/<to>/<short-digest>` at
+main plus one commit that copies the source tier's `release.yaml` to
+`tiers/<to>/release.yaml`, and opens (or updates) a PR labelled `promotion`
+with the evidence tables. A failed gate opens nothing.
+
+## Checks
+
+Every app gets the common checks; `checks:` in apps.yaml adds app sets.
+
+| set | checks |
+|---|---|
+| common | Flux Kustomization Ready at/after the release commit · OCIRepository artifact = release digest and HelmRelease Ready with that chart (`history[0].ociDigest`, config digest) · running containers on the image tags the release pins · Helm tests passed (where enabled) |
+| kyverno | webhooks registered with ready endpoints · all policies Ready · dry-run: known-good pod admitted, privileged pod denied (Deny) / admitted (Audit) · canary PolicyReport failures not above baseline |
+| kyverno-policies | chart policies Ready · enforcement mode matches the HelmRelease · privileged pod denied/admitted per mode |
+| guardrails | guard policies Ready · dry-run: HelmRepository denied, foreign OCIRepository denied, GHCR OCIRepository admitted |
+| kube-prometheus-stack | Prometheus ready · canary scraped ≥ `minScrapes` times since Ready and up · all targets up · no rule evaluation failures · Grafana health + datasource health · a known dashboard query returns data |
+| otel-collector | collector Deployment available · accepted spans increasing · export failures not increasing (two samples ≥ `sampleInterval` apart) |
+
+### Adding a check
+
+Implement `gate.Check` (`Name`, `Run(ctx, *gate.Env) gate.Result`) and
+register a set in `internal/checks` with `Register(name, factory)`. Return
+`Pending` while there isn't enough data to answer. The interface is small on
+purpose: a check backed by an external system, e.g. a HelmReleaseTest
+resource, just reads that resource's status and maps it to a `Result`.
+
+## Layout
+
+```
+cmd/promoter         CLI
+internal/gate        Check interface, runner (poll until answer or timeout), report/table
+internal/checks      common + per-app checks, Prometheus/metrics helpers
+internal/cluster     kube clients, service HTTP (port-forward locally, DNS in-cluster), dry-run, Events
+internal/ledger      GitHub: Deployments, evidence comments, promotion PRs
+internal/promote     check / promote orchestration
+internal/config      tiers.yaml / apps.yaml
+internal/release     release.yaml parsing
+```
+
+`go test ./...` covers the runner, every check against fake clusters, the
+promote flow against an in-memory ledger, and the GitHub calls against a fake API.

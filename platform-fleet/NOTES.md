@@ -1,7 +1,8 @@
 # Notes
 
-Running notes for the evidence-gated promotion demo. Status: Phases 0–1 written
-and statically validated; not yet run on live clusters.
+Running notes for the evidence-gated promotion demo. Status: Phases 0–2 written;
+0–1 statically validated, 2 unit-tested against fakes; nothing run on live
+clusters or real GitHub yet.
 
 ## Decisions
 
@@ -95,6 +96,39 @@ needs higher inotify limits on Linux:
 `sudo sysctl fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512`.
 
 **Measured:** _TBD after first `task up`._
+
+## Promoter (Phase 2)
+
+- **Evidence storage.** A Deployment's payload is fixed at creation, but the
+  outcome is known only at the end. So the full table goes in a commit comment
+  on the applied commit, linked as the Deployment status `log_url`, with the
+  recorded metrics (e.g. canary PolicyReport failures) in a hidden JSON marker.
+  The next run reads its baseline from the last *successful* Deployment's
+  comment.
+- **One Deployment per (tier, cluster).** The payload names the cluster, and
+  `promote` requires every cluster of the source tier to have a `success`
+  Deployment for the digest. Locally the CLI checks all of a tier's clusters;
+  in-cluster (Phase 4) each attests only itself and whichever finishes last
+  opens the PR.
+- **Pending vs fail.** "Not enough data yet" (canary not scraped 3 times yet,
+  webhook not yet enforcing a fresh policy, second counter sample not due) is
+  pending and re-asked; it becomes a failure with the same reason at `maxWait`.
+  Things that cannot improve by waiting (HelmRelease `UpgradeFailed`, rule
+  evaluation failures, a known-good pod denied) fail immediately.
+- **Reads one Secret.** The Grafana datasource/dashboard checks need the admin
+  login from `monitoring/grafana`. Everything else is read-only plus
+  server-side dry-run creates and Event creates.
+- **OTel "from the canary".** Collector self-metrics don't label by client;
+  the canary is the only span producer in the demo, so accepted-spans growth is
+  attributed to it. In a real fleet use spanmetrics or a per-tenant pipeline.
+- **Dashboard check.** The first panels of the chosen kps dashboard rely on
+  node-exporter rules we disabled, so the check tries the first few panel
+  queries and passes on the first that returns data.
+- **To verify in Phase 3:** environments with a deployment branch policy
+  ("only main") may reject API-created Deployments whose `ref` is a SHA, and a
+  prd environment with required reviewers might also gate the promoter's own
+  Deployments (post-merge). If so: record Deployments in a separate
+  `<tier>-gate` environment, or set ref to `main` with the SHA in the payload.
 
 ## Trust assumptions
 
