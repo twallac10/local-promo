@@ -52,13 +52,26 @@ create() {
 
 push() {
   for repo in "$TEMPLATE" $(app_repos) "${OTHERS[@]}"; do sync_repo "$repo"; done
+  tag_promoter
+}
+
+# App repos pin the reusable workflow by tag; create the tag for VERSION if
+# it doesn't exist yet. Tags are never moved: bump VERSION for a new release.
+tag_promoter() {
+  local v; v=$(cat "$WORKSPACE/platform-promoter/VERSION")
+  if gh api "repos/$OWNER/platform-promoter/git/ref/tags/$v" >/dev/null 2>&1; then
+    echo "platform-promoter: tag $v exists"; return 0
+  fi
+  local sha; sha=$(gh api "repos/$OWNER/platform-promoter/git/ref/heads/main" -q .object.sha)
+  gh api "repos/$OWNER/platform-promoter/git/refs" -f ref="refs/tags/$v" -f sha="$sha" >/dev/null
+  echo "platform-promoter: tagged $v at ${sha:0:7}"
 }
 
 # Every app folder must have the template's files (plus chart/ for apps built
 # from source), and the shared files must be byte-identical to the template.
 shape() {
   local t="$WORKSPACE/$TEMPLATE" fail=0 repo f
-  local shared=(.github/workflows/mirror.yaml .gitignore base/kustomization.yaml scripts/mirror-chart.sh scripts/set-digest.sh)
+  local shared=(.github/workflows/mirror.yaml .github/workflows/promotion.yaml .gitignore base/kustomization.yaml scripts/mirror-chart.sh scripts/set-digest.sh)
   for tier in $(tiers); do shared+=("tiers/$tier/kustomization.yaml"); done
   for repo in $(app_repos); do
     local d="$WORKSPACE/$repo"
@@ -74,6 +87,10 @@ shape() {
         || echo "note  $repo: tiers/$tier/release.yaml differs from $(first_tier) (fine mid-promotion)"
     done
   done
+  # Callers must pin the reusable workflow at the promoter's released version.
+  local v; v=$(cat "$WORKSPACE/platform-promoter/VERSION")
+  grep -q "guardrails.yaml@$v\$" "$t/.github/workflows/promotion.yaml" && grep -q "promoter-ref: $v\$" "$t/.github/workflows/promotion.yaml" \
+    || { echo "PIN   promotion.yaml must use guardrails.yaml@$v and promoter-ref: $v (platform-promoter/VERSION)"; fail=1; }
   [ $fail -eq 0 ] && echo "all app repos match the template shape"
   return $fail
 }

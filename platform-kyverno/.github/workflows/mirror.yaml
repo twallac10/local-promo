@@ -76,3 +76,5 @@ jobs:
           gh pr create --base main --head "$branch" --label promotion \
             --title "promote($tier): $(yq '.name' mirror/chart.yaml) $VERSION" --body "$body" \
             || gh pr edit "$branch" --body "$body"
+          # Merges itself once the required promotion-gate check passes.
+          gh pr merge "$branch" --auto --squash

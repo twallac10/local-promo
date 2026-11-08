@@ -1,7 +1,7 @@
 # Notes
 
-Running notes for the evidence-gated promotion demo. Status: Phases 0–2 written;
-0–1 statically validated, 2 unit-tested against fakes; nothing run on live
+Running notes for the evidence-gated promotion demo. Status: Phases 0–3 written;
+0–1 statically validated, 2–3 unit-tested against fakes; nothing run on live
 clusters or real GitHub yet.
 
 ## Decisions
@@ -124,11 +124,49 @@ needs higher inotify limits on Linux:
 - **Dashboard check.** The first panels of the chosen kps dashboard rely on
   node-exporter rules we disabled, so the check tries the first few panel
   queries and passes on the first that returns data.
-- **To verify in Phase 3:** environments with a deployment branch policy
-  ("only main") may reject API-created Deployments whose `ref` is a SHA, and a
-  prd environment with required reviewers might also gate the promoter's own
-  Deployments (post-merge). If so: record Deployments in a separate
-  `<tier>-gate` environment, or set ref to `main` with the SHA in the payload.
+
+## CI guardrails and environments (Phase 3)
+
+- **One required check:** `promotion / promotion-gate` (caller job `promotion`
+  in each app repo's `promotion.yaml`, job `promotion-gate` in the reusable
+  workflow in platform-promoter, pinned `@v0.1.0`).
+- **Why three jobs instead of one.** Branch protection treats a *skipped* job
+  as passing. If `promotion-gate` simply needed the guardrails job and the
+  guardrails failed, the gate would be skipped and the PR would auto-merge.
+  So `guardrails` verifies, `approval` (promotions only) runs in the target
+  tier's environment and pauses for reviewers, and `promotion-gate` always
+  runs and fails unless guardrails passed and, for promotions, approval passed.
+- **The workflow runs on every PR**, so the required check exists on
+  non-promotion PRs too. Those get the OCI-only scan and the secret scan; any
+  change to a `tiers/*/release.yaml` is treated as a promotion whatever the
+  label says, so release changes can't sneak in as ordinary PRs.
+- **Entry PRs** (first tier) have no source tier: the guardrail checks the
+  digest exists in GHCR instead.
+- **The verifier is Go** (`promoter verify-pr`, unit-tested) built from
+  platform-promoter at `promoter-ref`, which must equal the pinned tag
+  (`task lint` checks both against `platform-promoter/VERSION`).
+  `task repos:push` creates the tag; tags are never moved.
+- **Deviation: branch policy is `main` + `promote/*`, not only `main`.** The
+  approval job runs on the promotion PR, before merge (merging is what deploys),
+  so an environment that only allows `main` would refuse the job. A promote/*
+  branch can't deploy anything by itself: it only reaches a cluster by merging,
+  which needs the gate.
+- **Prevent self-review vs. one person.** The promotion PR (and so the
+  workflow run) is triggered by the PROMOTER_TOKEN owner. With prevent
+  self-review on, that person can't approve prd. For a real setup use a
+  machine account for the promoter; for a one-person demo run
+  `PREVENT_SELF_REVIEW=false task gh:envs`.
+- **`enforce_admins: false`** so bootstrap (`task repos:push`, `charts:seed`)
+  can still push to main directly. Admins can therefore bypass the gate; in a
+  real setup turn it on once bootstrapped (and the promoter token must not be
+  an admin's).
+- **To verify on first run:** that GitHub doesn't apply environment protection
+  rules to the promoter's API-created Deployments (environment = tier). If it
+  does, move the ledger to `<tier>-gate` environments (one-line change in
+  `ledger.StartDeployment` and the verifier).
+- Approval and tier.yaml: only promotions need approval. A plain PR changing
+  `tiers/prd/tier.yaml` merges with just the OCI/secret checks; in a real
+  setup add CODEOWNERS review for tier.yaml.
 
 ## Trust assumptions
 

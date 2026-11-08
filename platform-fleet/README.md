@@ -22,7 +22,7 @@ platform-kube-prometheus-stack, platform-otel-collector, platform-promoter.
 ## Prereqs
 
 docker (≥ 12 GiB memory for the engine, see NOTES.md), kind v0.31.0, kubectl,
-flux v2.10.0, helm v3.16+, gh (authenticated), task, yq v4 (mikefarah), kustomize,
+flux v2.10.0, helm v3.16+, gh (authenticated), jq, task, yq v4 (mikefarah), kustomize,
 kubeconform, python3 with PyYAML, rsync, go.
 
 Tokens (separate, least privilege, never committed):
@@ -42,10 +42,13 @@ task lint             # static checks, no cluster
 task repos:create     # create repos on GitHub and push this workspace
 task charts:seed      # mirror charts to GHCR, pin every tier to the digests
 #   -> make the GHCR packages public (one time, see NOTES.md)
-task repos:push       # commit the digests
+task repos:push       # commit the digests, tag platform-promoter (VERSION)
+PROMOTER_TOKEN=... task gh:envs   # environments, branch protection, auto-merge, secret
 task up               # kind clusters + Flux bootstrap per tier
 task status
 task grafana -- dev
+task check -- --app kyverno --tier dev        # evidence table + dev Deployment
+task promote -- --app kyverno --from dev      # gate dev, open the stg PR (auto-merges)
 task down
 ```
 

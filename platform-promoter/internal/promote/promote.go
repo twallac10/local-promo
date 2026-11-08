@@ -237,6 +237,7 @@ func (p *Promoter) Promote(ctx context.Context, appName, fromTier string) (strin
 		Body:          PRBody(res, to),
 		CommitMessage: fmt.Sprintf("promote(%s): %s %s (%s) from %s", to.Name, app.Name, res.Release.Version, res.Release.ShortDigest(), fromTier),
 		Labels:        []string{Label},
+		AutoMerge:     true, // merges once promotion-gate passes (after approval where required)
 	})
 	return url, res, err
 }

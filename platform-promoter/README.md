@@ -41,6 +41,21 @@ main plus one commit that copies the source tier's `release.yaml` to
 `tiers/<to>/release.yaml`, and opens (or updates) a PR labelled `promotion`
 with the evidence tables. A failed gate opens nothing.
 
+## CI: reusable guardrail workflow
+
+`.github/workflows/guardrails.yaml`, called by each app repo's
+`promotion.yaml` on every PR (pinned by tag). The required check is
+`promotion / promotion-gate`. `promoter verify-pr` fails a promotion PR if:
+
+- any file other than `tiers/<target>/release.yaml` changed
+- the target `release.yaml` isn't byte-identical to the source tier's on main
+- the source tier's latest gate Deployment isn't `success` for the same digest
+  on every one of its clusters (entry tier: the digest must exist in GHCR)
+- a `HelmRepository`, or an `OCIRepository` outside our GHCR prefix, appears anywhere
+
+plus a gitleaks scan of the PR's commits. Promotions then wait in the target
+tier's environment (reviewers where `requiresApproval`), and auto-merge.
+
 ## Checks
 
 Every app gets the common checks; `checks:` in apps.yaml adds app sets.

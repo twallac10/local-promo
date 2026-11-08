@@ -27,6 +27,8 @@ const usage = `usage:
   promoter check   --app <app> --tier <tier> [flags]
   promoter promote --app <app> --from <tier> [flags]
   promoter checks                                  list registered check sets
+  promoter verify-pr --fleet <dir|url> [--repo r] [--dir .] [--main-ref origin/main] [--labels a,b]
+                                                   CI guardrails for a PR (no cluster access)
 
 flags:
   --fleet <dir|url>   platform-fleet dir or raw URL with tiers.yaml/apps.yaml
@@ -51,6 +53,9 @@ func main() {
 }
 
 func run(ctx context.Context, cmd string, args []string) int {
+	if cmd == "verify-pr" {
+		return verifyPR(ctx, args)
+	}
 	if cmd == "checks" {
 		fmt.Println("common: flux kustomization, chart digest, image tags, helm tests")
 		fmt.Println("sets:   " + strings.Join(checks.Names(), ", "))

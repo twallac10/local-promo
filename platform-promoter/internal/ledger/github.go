@@ -234,7 +234,45 @@ func (g *GitHub) OpenPromotionPR(ctx context.Context, pr PR) (string, error) {
 			return p.GetHTMLURL(), fmt.Errorf("label PR: %w", err)
 		}
 	}
+	if pr.AutoMerge {
+		if err := g.enableAutoMerge(ctx, p.GetNodeID()); err != nil {
+			return p.GetHTMLURL(), fmt.Errorf("enable auto-merge: %w", err)
+		}
+	}
 	return p.GetHTMLURL(), nil
+}
+
+// enableAutoMerge uses GraphQL (REST has no endpoint for it). Requires
+// "Allow auto-merge" on the repo (task gh:envs sets it).
+func (g *GitHub) enableAutoMerge(ctx context.Context, nodeID string) error {
+	q := map[string]any{
+		"query":     `mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) { clientMutationId } }`,
+		"variables": map[string]any{"id": nodeID},
+	}
+	u := strings.TrimSuffix(g.Client.BaseURL.String(), "/")
+	u = strings.TrimSuffix(strings.TrimSuffix(u, "/api/v3"), "/") + "/graphql"
+	if strings.Contains(u, "api.github.com") {
+		u = "https://api.github.com/graphql"
+	}
+	req, err := g.Client.NewRequest(http.MethodPost, u, q)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if _, err := g.Client.Do(ctx, req, &out); err != nil {
+		return err
+	}
+	if len(out.Errors) > 0 {
+		// Already enabled / clean status are not problems.
+		if m := out.Errors[0].Message; !strings.Contains(m, "already") && !strings.Contains(m, "clean status") {
+			return errors.New(m)
+		}
+	}
+	return nil
 }
 
 // IsNotFound reports a GitHub 404.

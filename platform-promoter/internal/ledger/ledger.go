@@ -67,6 +67,9 @@ type PR struct {
 	Title, Body        string
 	CommitMessage      string
 	Labels             []string
+	// AutoMerge enables GitHub auto-merge (squash): the PR merges itself once
+	// the required promotion-gate check passes.
+	AutoMerge bool
 }
 
 const evidenceMarker = "promoter-evidence"

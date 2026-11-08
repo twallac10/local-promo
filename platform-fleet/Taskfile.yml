@@ -20,7 +20,7 @@ tasks:
     cmds:
       - |
         missing=0
-        for t in docker kind kubectl flux helm gh yq kustomize kubeconform go python3 rsync; do
+        for t in docker kind kubectl flux helm gh jq yq kustomize kubeconform go python3 rsync; do
           command -v $t >/dev/null || { echo "missing: $t"; missing=1; }
         done
         exit $missing
@@ -91,8 +91,8 @@ tasks:
     deps: [promoter:build]
     cmds: ['"{{.WORKSPACE}}/platform-promoter/bin/promoter" promote --fleet "{{.ROOT_DIR}}" {{.CLI_ARGS}}']
   gh:envs:
-    desc: "Phase 3: one GitHub Environment per tier in every app repo"
-    cmds: ['echo "not built yet (Phase 3)"; exit 1']
+    desc: "Environments per tier, branch protection, auto-merge, label and PROMOTER_TOKEN secret in every app repo"
+    cmds: [./scripts/gh-envs.sh]
   demo:good:
     desc: "Phase 5"
     cmds: ['echo "not built yet (Phase 5)"; exit 1']

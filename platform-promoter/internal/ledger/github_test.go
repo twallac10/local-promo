@@ -38,6 +38,7 @@ func fakeGitHub(t *testing.T, routes map[string]func(w http.ResponseWriter, body
 			h(w, body)
 			return
 		}
+		t.Logf("unrouted %s", key)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(`{"message":"Not Found"}`))
 	}))
@@ -102,12 +103,13 @@ func TestOpenPromotionPRCreatesBranchFileAndLabel(t *testing.T) {
 		"GET /repos/o/r/contents/tiers/stg/release.yaml": reply(`{"type":"file","sha":"filesha","encoding":"base64","content":"` + base64.StdEncoding.EncodeToString([]byte("old")) + `"}`),
 		"PUT /repos/o/r/contents/tiers/stg/release.yaml": reply(`{"content":{"sha":"new"}}`),
 		"GET /repos/o/r/pulls":                           reply(`[]`),
-		"POST /repos/o/r/pulls":                          reply(`{"number": 5, "html_url": "https://github.com/o/r/pull/5"}`),
+		"POST /repos/o/r/pulls":                          reply(`{"number": 5, "node_id": "PR_5", "html_url": "https://github.com/o/r/pull/5"}`),
+		"POST /graphql":                                  reply(`{"data": {}}`),
 		"POST /repos/o/r/issues/5/labels":                reply(`[{"name":"promotion"}]`),
 	})
 	u, err := g.OpenPromotionPR(context.Background(), PR{
 		Repo: "r", Branch: "promote/stg/abc", Path: "tiers/stg/release.yaml", Content: []byte("new"),
-		Title: "t", Body: "b", CommitMessage: "m", Labels: []string{"promotion"},
+		Title: "t", Body: "b", CommitMessage: "m", Labels: []string{"promotion"}, AutoMerge: true,
 	})
 	if err != nil || u != "https://github.com/o/r/pull/5" {
 		t.Fatalf("u=%q err=%v", u, err)
@@ -120,6 +122,15 @@ func TestOpenPromotionPRCreatesBranchFileAndLabel(t *testing.T) {
 		case c.Method == "POST" && strings.HasSuffix(c.Path, "/git/refs"):
 			ref = c.Body
 		}
+	}
+	var gql map[string]any
+	for _, c := range *calls {
+		if strings.HasSuffix(c.Path, "/graphql") {
+			gql = c.Body
+		}
+	}
+	if gql == nil || !strings.Contains(gql["query"].(string), "enablePullRequestAutoMerge") || gql["variables"].(map[string]any)["id"] != "PR_5" {
+		t.Errorf("auto-merge not enabled: %v", gql)
 	}
 	if ref["sha"] != "mainsha" || ref["ref"] != "refs/heads/promote/stg/abc" {
 		t.Errorf("branch not created from main: %v", ref)
