@@ -14,7 +14,14 @@ source "$(dirname "$0")/lib.sh"
 : "${GITHUB_TOKEN:?set GITHUB_TOKEN to the Flux bootstrap token for $OWNER/platform-fleet}"
 FLUX_VERSION=${FLUX_VERSION:-v2.10.0}
 
-for tier in $(tiers); do
+# Optional tier names (task up -- dev stg): only those, in tiers.yaml order.
+selected=$(tiers)
+if [ $# -gt 0 ]; then
+  for t in "$@"; do tiers | grep -qx "$t" || die "unknown tier $t (tiers.yaml: $(tiers | xargs))"; done
+  selected=$(tiers | grep -xF -f <(printf '%s\n' "$@"))
+fi
+
+for tier in $selected; do
   for ctx in $(tier_contexts "$tier"); do
     name=$(kind_name "$ctx")
     if kind get clusters 2>/dev/null | grep -qx "$name"; then

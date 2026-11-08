@@ -64,12 +64,12 @@ tasks:
 
   # --- clusters ------------------------------------------------------------
   up:
-    desc: Create a kind cluster per tier and bootstrap Flux (needs GITHUB_TOKEN for flux bootstrap)
-    cmds: [./scripts/up.sh]
+    desc: "Create tier clusters one at a time and bootstrap Flux (GITHUB_TOKEN). Optional tiers: task up -- dev"
+    cmds: ["./scripts/up.sh {{.CLI_ARGS}}"]
 
   down:
-    desc: Delete every tier's kind cluster
-    cmds: [./scripts/down.sh]
+    desc: "Delete tier clusters (all, or: task down -- prd)"
+    cmds: ["./scripts/down.sh {{.CLI_ARGS}}"]
 
   status:
     desc: Flux status per tier, then the latest gate Deployment per app per tier
